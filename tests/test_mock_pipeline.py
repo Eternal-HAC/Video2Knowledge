@@ -5,10 +5,11 @@ import unittest
 from pathlib import Path
 
 from app.cli import main, run_import_url
-from app.downloader import get_mock_metadata
+from app.downloader import get_mock_metadata, get_metadata_for_source
 from app.markdown_writer import render_markdown
+from app.platform_adapter import resolve_video_source
 from app.summarizer import summarize_mock
-from app.transcript import get_mock_transcript
+from app.transcript import acquire_transcript_mock, get_mock_transcript
 
 
 class MockPipelineTests(unittest.TestCase):
@@ -20,6 +21,28 @@ class MockPipelineTests(unittest.TestCase):
         self.assertEqual(metadata.source_url, url)
         self.assertEqual(metadata.status, "mock")
         self.assertIn("mock", metadata.tags)
+
+    def test_platform_adapter_detects_youtube_url(self) -> None:
+        source = resolve_video_source("https://www.youtube.com/watch?v=mock")
+
+        self.assertEqual(source.source_type, "url")
+        self.assertEqual(source.platform, "youtube")
+
+        metadata = get_metadata_for_source(source)
+
+        self.assertEqual(metadata.platform, "youtube")
+
+    def test_transcript_result_records_mock_strategy(self) -> None:
+        metadata = get_mock_metadata("https://example.com/watch?v=mock")
+
+        result = acquire_transcript_mock(metadata)
+
+        self.assertEqual(result.provider, "mock_official_subtitles")
+        self.assertEqual(
+            result.attempted_providers,
+            ["official_subtitles", "transcript_api", "whisper"],
+        )
+        self.assertTrue(result.segments)
 
     def test_render_markdown_contains_required_frontmatter_and_sections(self) -> None:
         metadata = get_mock_metadata("https://example.com/watch?v=mock")
@@ -77,4 +100,3 @@ class MockPipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

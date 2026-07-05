@@ -6,6 +6,13 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class VideoSource:
+    raw_input: str
+    source_type: str
+    platform: str
+
+
+@dataclass(frozen=True)
 class VideoMetadata:
     title: str
     platform: str
@@ -26,10 +33,16 @@ class TranscriptSegment:
 
 
 @dataclass(frozen=True)
+class TranscriptResult:
+    segments: list[TranscriptSegment]
+    provider: str
+    attempted_providers: list[str]
+
+
+@dataclass(frozen=True)
 class Summary:
     one_sentence_summary: str
     core_ideas: list[str]
     knowledge_points: list[str]
     technical_terms: list[str]
     action_items: list[str]
-

@@ -5,7 +5,14 @@ This module does not fetch official subtitles or external transcripts in Stage 1
 
 from __future__ import annotations
 
-from app.models import TranscriptSegment, VideoMetadata
+from app.models import TranscriptResult, TranscriptSegment, VideoMetadata
+
+
+TRANSCRIPT_PROVIDER_ORDER = [
+    "official_subtitles",
+    "transcript_api",
+    "whisper",
+]
 
 
 def get_mock_transcript(metadata: VideoMetadata) -> list[TranscriptSegment]:
@@ -14,6 +21,15 @@ def get_mock_transcript(metadata: VideoMetadata) -> list[TranscriptSegment]:
     return [
         TranscriptSegment("00:00:00", "00:00:20", f"这是来自 {metadata.platform} 的 Mock 视频内容。"),
         TranscriptSegment("00:00:20", "00:00:45", "Video2Knowledge 会把视频信息转成结构化 Markdown。"),
-        TranscriptSegment("00:00:45", "00:01:10", "第一阶段只验证本地流水线，不调用真实 API。"),
+        TranscriptSegment("00:00:45", "00:01:10", "当前阶段只验证本地流水线，不调用真实 API。"),
     ]
 
+
+def acquire_transcript_mock(metadata: VideoMetadata) -> TranscriptResult:
+    """Return Mock transcript data while preserving the future fallback order."""
+
+    return TranscriptResult(
+        segments=get_mock_transcript(metadata),
+        provider="mock_official_subtitles",
+        attempted_providers=TRANSCRIPT_PROVIDER_ORDER,
+    )

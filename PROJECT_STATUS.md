@@ -21,3 +21,17 @@ Known constraints:
 - `output/` is generated runtime data and should not be committed.
 - Real video, transcript, Whisper, LLM, Notion, Feishu, MCP, and browser extension work is deferred.
 
+## 2026-07-05
+
+Status: Stage 2 interface groundwork started.
+
+Changes:
+
+- Added a platform adapter boundary for URL/local source classification.
+- Added transcript result metadata for future fallback strategy.
+- Kept all providers Mock-only.
+
+Validation target:
+
+- Unit tests must still pass.
+- Existing Mock CLI command must remain compatible.

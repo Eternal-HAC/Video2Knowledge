@@ -6,7 +6,8 @@
 - [x] Create Mock pipeline modules.
 - [x] Create Markdown template.
 - [x] Add unit tests for Mock flow.
-- [ ] Replace Mock downloader with real platform adapter.
+- [x] Add platform adapter interface while keeping Mock metadata.
+- [ ] Replace Mock metadata provider with real downloader-backed implementation.
 - [ ] Add official subtitle acquisition.
 - [ ] Add transcript API fallback.
 - [ ] Add local Whisper fallback.
@@ -21,4 +22,3 @@
 - Browser extension.
 - Batch import.
 - Prompt template management.
-

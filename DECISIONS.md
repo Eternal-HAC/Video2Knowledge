@@ -67,3 +67,20 @@ The initial code is easy to inspect and run with `python -m app.cli`, but the pa
 
 Follow-up Review:
 If Video2Knowledge needs formal packaging or publishing, evaluate migrating to `src/video2knowledge/`.
+
+## 2026-07-05
+
+Decision:
+Introduce platform and transcript provider boundaries before real integrations.
+
+Reason:
+The next stage needs a stable place to plug in YouTube, local files, subtitle APIs, and Whisper without mixing provider-specific code into the CLI.
+
+Alternatives:
+Call real provider libraries directly from the CLI when each feature is added.
+
+Impact:
+The CLI remains stable while implementation modules can be replaced incrementally.
+
+Follow-up Review:
+Revisit after the first real YouTube metadata and subtitle implementation is added.

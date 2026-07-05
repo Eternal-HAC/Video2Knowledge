@@ -26,6 +26,25 @@ example URL
 -> local Markdown file
 ```
 
+## Stage 2 Interface Groundwork
+
+The current code defines the first replaceable boundaries without calling real providers:
+
+```text
+raw input
+-> platform adapter
+-> metadata provider
+-> transcript provider strategy
+-> summarizer
+-> Markdown writer
+-> local exporter
+```
+
+- `platform_adapter` classifies URL and local file inputs and infers platform labels.
+- `downloader` exposes a metadata boundary that is still backed by Mock data.
+- `transcript` records the future fallback order: official subtitles, transcript API, Whisper.
+- The CLI remains compatible with `python -m app.cli import-url ...`.
+
 ## Design Principles
 
 - Local First.
@@ -44,4 +63,3 @@ example URL
 - OpenAI-compatible, Anthropic, or Gemini APIs for LLM summarization.
 
 These providers are not used in Stage 1.
-
