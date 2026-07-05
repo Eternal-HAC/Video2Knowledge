@@ -46,6 +46,14 @@ python -m app.cli import-url "https://example.com/watch?v=mock" --output-dir out
 
 The command writes a Markdown file under `output/markdown/`.
 
+Provider flags exist to make the future replacement points explicit:
+
+```powershell
+python -m app.cli import-url "https://example.com/watch?v=mock" --metadata-provider mock --transcript-provider mock
+```
+
+Only `mock` providers are implemented. Non-Mock provider names are placeholders and fail with explicit not-implemented errors.
+
 ## Run Tests
 
 ```powershell
@@ -68,4 +76,3 @@ The generated note contains YAML Frontmatter and these sections:
 GitHub repository:
 
 https://github.com/Eternal-HAC/Video2Knowledge
-

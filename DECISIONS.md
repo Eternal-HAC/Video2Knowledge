@@ -84,3 +84,20 @@ The CLI remains stable while implementation modules can be replaced incrementall
 
 Follow-up Review:
 Revisit after the first real YouTube metadata and subtitle implementation is added.
+
+## 2026-07-05
+
+Decision:
+Expose provider selection flags before implementing real providers.
+
+Reason:
+The CLI can keep a stable shape while non-Mock providers fail clearly instead of silently pretending to work.
+
+Alternatives:
+Hide provider selection until real integrations are complete.
+
+Impact:
+Users and tests can see the planned replacement points, but only `mock` is valid for successful runs right now.
+
+Follow-up Review:
+Remove or revise placeholder behavior when `yt-dlp` metadata and the transcript fallback chain are implemented.

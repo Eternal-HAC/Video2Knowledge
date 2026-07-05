@@ -1,13 +1,42 @@
-"""Mock metadata resolver.
+"""Metadata provider boundary.
 
-This module does not download media in Stage 1.
+The default provider is Mock. Real downloader-backed providers are explicit
+placeholders until external dependencies are introduced.
 """
 
 from __future__ import annotations
 
+from typing import Protocol
 from urllib.parse import urlparse
 
+from app.errors import ProviderNotImplementedError
 from app.models import VideoMetadata, VideoSource
+
+
+class MetadataProvider(Protocol):
+    """Interface for resolving video metadata."""
+
+    name: str
+
+    def get_metadata(self, source: VideoSource) -> VideoMetadata:
+        """Resolve metadata for a video source."""
+
+
+class MockMetadataProvider:
+    name = "mock"
+
+    def get_metadata(self, source: VideoSource) -> VideoMetadata:
+        return get_mock_metadata(source.raw_input, platform=source.platform)
+
+
+class YtDlpMetadataProvider:
+    name = "yt-dlp"
+
+    def get_metadata(self, source: VideoSource) -> VideoMetadata:
+        raise ProviderNotImplementedError(
+            "yt-dlp metadata provider is not implemented yet. "
+            "Stage 2 currently defines the provider boundary only."
+        )
 
 
 def get_mock_metadata(source_url: str, platform: str | None = None) -> VideoMetadata:
@@ -32,4 +61,25 @@ def get_mock_metadata(source_url: str, platform: str | None = None) -> VideoMeta
 def get_metadata_for_source(source: VideoSource) -> VideoMetadata:
     """Resolve metadata through the current Mock provider boundary."""
 
-    return get_mock_metadata(source.raw_input, platform=source.platform)
+    return get_metadata_with_provider(source, provider_name="mock")
+
+
+def get_metadata_with_provider(
+    source: VideoSource,
+    provider_name: str = "mock",
+) -> VideoMetadata:
+    """Resolve metadata with an explicit provider name."""
+
+    provider = build_metadata_provider(provider_name)
+    return provider.get_metadata(source)
+
+
+def build_metadata_provider(provider_name: str) -> MetadataProvider:
+    """Create a metadata provider by name."""
+
+    normalized = provider_name.lower()
+    if normalized == "mock":
+        return MockMetadataProvider()
+    if normalized == "yt-dlp":
+        return YtDlpMetadataProvider()
+    raise ValueError(f"Unknown metadata provider: {provider_name}")

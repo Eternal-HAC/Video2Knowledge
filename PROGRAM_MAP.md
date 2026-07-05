@@ -7,8 +7,9 @@
 ## Pipeline Modules
 
 - `app/platform_adapter.py`: classifies URL or local file inputs and infers a platform label.
-- `app/downloader.py`: returns Mock video metadata. Does not download media.
-- `app/transcript.py`: returns Mock transcript segments and records the future fallback strategy. Does not fetch subtitles.
+- `app/downloader.py`: metadata provider boundary with Mock implementation and `yt-dlp` placeholder. Does not download media.
+- `app/transcript.py`: transcript provider boundary with Mock implementation and real fallback placeholder. Does not fetch subtitles.
+- `app/errors.py`: shared project exceptions for explicit provider boundary failures.
 - `app/whisper.py`: placeholder for future local transcription. Does not run Whisper.
 - `app/summarizer.py`: returns Mock knowledge extraction output. Does not call LLMs.
 - `app/markdown_writer.py`: renders structured Markdown from metadata, transcript, and summary.

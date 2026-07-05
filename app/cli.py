@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
-from app.downloader import get_metadata_for_source
+from app.downloader import get_metadata_with_provider
+from app.errors import ProviderNotImplementedError
 from app.exporter.obsidian import export_markdown
 from app.markdown_writer import render_markdown
 from app.platform_adapter import resolve_video_source
 from app.summarizer import summarize_mock
-from app.transcript import acquire_transcript_mock
+from app.transcript import acquire_transcript_with_provider
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -30,13 +32,33 @@ def build_parser() -> argparse.ArgumentParser:
         default="output/markdown",
         help="Directory for generated Markdown files.",
     )
+    import_url.add_argument(
+        "--metadata-provider",
+        choices=["mock", "yt-dlp"],
+        default="mock",
+        help="Metadata provider to use. Only mock is implemented.",
+    )
+    import_url.add_argument(
+        "--transcript-provider",
+        choices=["mock", "real-fallback"],
+        default="mock",
+        help="Transcript provider to use. Only mock is implemented.",
+    )
     return parser
 
 
-def run_import_url(url: str, output_dir: Path | str) -> Path:
+def run_import_url(
+    url: str,
+    output_dir: Path | str,
+    metadata_provider: str = "mock",
+    transcript_provider: str = "mock",
+) -> Path:
     source = resolve_video_source(url)
-    metadata = get_metadata_for_source(source)
-    transcript_result = acquire_transcript_mock(metadata)
+    metadata = get_metadata_with_provider(source, provider_name=metadata_provider)
+    transcript_result = acquire_transcript_with_provider(
+        metadata,
+        provider_name=transcript_provider,
+    )
     transcript = transcript_result.segments
     summary = summarize_mock(metadata, transcript)
     markdown = render_markdown(metadata, transcript, summary)
@@ -48,7 +70,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "import-url":
-        output_path = run_import_url(args.url, args.output_dir)
+        try:
+            output_path = run_import_url(
+                args.url,
+                args.output_dir,
+                metadata_provider=args.metadata_provider,
+                transcript_provider=args.transcript_provider,
+            )
+        except (ProviderNotImplementedError, ValueError) as error:
+            print(f"Error: {error}", file=sys.stderr)
+            return 1
         print(f"Generated Markdown: {output_path}")
         return 0
 

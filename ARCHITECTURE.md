@@ -45,6 +45,11 @@ raw input
 - `transcript` records the future fallback order: official subtitles, transcript API, Whisper.
 - The CLI remains compatible with `python -m app.cli import-url ...`.
 
+Non-Mock provider boundaries now exist but intentionally raise explicit not-implemented errors:
+
+- Metadata provider placeholder: `yt-dlp`.
+- Transcript provider placeholder: `real-fallback`.
+
 ## Design Principles
 
 - Local First.

@@ -30,6 +30,7 @@ Changes:
 - Added a platform adapter boundary for URL/local source classification.
 - Added transcript result metadata for future fallback strategy.
 - Kept all providers Mock-only.
+- Added explicit non-Mock provider placeholders that fail with clear not-implemented errors.
 
 Validation target:
 

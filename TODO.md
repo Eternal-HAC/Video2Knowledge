@@ -7,6 +7,7 @@
 - [x] Create Markdown template.
 - [x] Add unit tests for Mock flow.
 - [x] Add platform adapter interface while keeping Mock metadata.
+- [x] Define real provider placeholders with explicit not-implemented errors.
 - [ ] Replace Mock metadata provider with real downloader-backed implementation.
 - [ ] Add official subtitle acquisition.
 - [ ] Add transcript API fallback.

@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
 
 from app.cli import main, run_import_url
-from app.downloader import get_mock_metadata, get_metadata_for_source
+from app.downloader import get_mock_metadata, get_metadata_with_provider
+from app.errors import ProviderNotImplementedError
 from app.markdown_writer import render_markdown
 from app.platform_adapter import resolve_video_source
 from app.summarizer import summarize_mock
-from app.transcript import acquire_transcript_mock, get_mock_transcript
+from app.transcript import (
+    acquire_transcript_mock,
+    acquire_transcript_with_provider,
+    get_mock_transcript,
+)
 
 
 class MockPipelineTests(unittest.TestCase):
@@ -28,7 +35,7 @@ class MockPipelineTests(unittest.TestCase):
         self.assertEqual(source.source_type, "url")
         self.assertEqual(source.platform, "youtube")
 
-        metadata = get_metadata_for_source(source)
+        metadata = get_metadata_with_provider(source)
 
         self.assertEqual(metadata.platform, "youtube")
 
@@ -43,6 +50,18 @@ class MockPipelineTests(unittest.TestCase):
             ["official_subtitles", "transcript_api", "whisper"],
         )
         self.assertTrue(result.segments)
+
+    def test_real_metadata_provider_boundary_is_explicitly_unimplemented(self) -> None:
+        source = resolve_video_source("https://www.youtube.com/watch?v=mock")
+
+        with self.assertRaises(ProviderNotImplementedError):
+            get_metadata_with_provider(source, provider_name="yt-dlp")
+
+    def test_real_transcript_provider_boundary_is_explicitly_unimplemented(self) -> None:
+        metadata = get_mock_metadata("https://example.com/watch?v=mock")
+
+        with self.assertRaises(ProviderNotImplementedError):
+            acquire_transcript_with_provider(metadata, provider_name="real-fallback")
 
     def test_render_markdown_contains_required_frontmatter_and_sections(self) -> None:
         metadata = get_mock_metadata("https://example.com/watch?v=mock")
@@ -96,6 +115,25 @@ class MockPipelineTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertTrue(list(Path(temp_dir).glob("*.md")))
+
+    def test_cli_non_mock_provider_returns_clear_error(self) -> None:
+        stderr = io.StringIO()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with contextlib.redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "import-url",
+                        "https://example.com/watch?v=mock",
+                        "--metadata-provider",
+                        "yt-dlp",
+                        "--output-dir",
+                        temp_dir,
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("yt-dlp metadata provider is not implemented yet", stderr.getvalue())
 
 
 if __name__ == "__main__":
