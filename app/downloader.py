@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Protocol
 from urllib.parse import parse_qs, urlparse
 
-from app.errors import ProviderNotImplementedError
+from app.errors import MetadataProviderError
 from app.models import VideoMetadata, VideoSource
 
 
@@ -33,10 +33,37 @@ class YtDlpMetadataProvider:
     name = "yt-dlp"
 
     def get_metadata(self, source: VideoSource) -> VideoMetadata:
-        raise ProviderNotImplementedError(
-            "yt-dlp metadata provider is not implemented yet. "
-            "Stage 2 currently defines the provider boundary only."
-        )
+        if source.platform != "youtube":
+            raise MetadataProviderError(
+                "yt-dlp metadata provider currently supports YouTube only."
+            )
+
+        try:
+            import yt_dlp
+        except ImportError as error:
+            raise MetadataProviderError(
+                "yt-dlp is not installed. Install project dependencies before "
+                "using metadata-provider yt-dlp."
+            ) from error
+
+        ydl_opts = {
+            "skip_download": True,
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+        }
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(source.raw_input, download=False)
+                sanitized = ydl.sanitize_info(info)
+        except Exception as error:
+            raise MetadataProviderError(f"yt-dlp metadata extraction failed: {error}") from error
+
+        if not isinstance(sanitized, dict):
+            raise MetadataProviderError("yt-dlp returned metadata in an unexpected shape.")
+
+        return _metadata_from_ytdlp_info(source, sanitized)
 
 
 def get_mock_metadata(source_url: str, platform: str | None = None) -> VideoMetadata:
@@ -56,6 +83,7 @@ def get_mock_metadata(source_url: str, platform: str | None = None) -> VideoMeta
         language="zh-CN",
         tags=["video2knowledge", "mock", "pkm"],
         status="mock",
+        channel_id="",
         source_id=source_id,
         canonical_url=source_url,
         thumbnail_url="",
@@ -99,3 +127,77 @@ def _extract_source_id(parsed_url, platform: str) -> str:
         if parsed_url.netloc.lower().endswith("youtu.be"):
             return parsed_url.path.strip("/")
     return ""
+
+
+def _metadata_from_ytdlp_info(
+    source: VideoSource,
+    info: dict[str, object],
+) -> VideoMetadata:
+    title = _string_value(info.get("title"))
+    source_id = _string_value(info.get("id"))
+    canonical_url = _string_value(info.get("webpage_url")) or source.raw_input
+
+    missing = [
+        field_name
+        for field_name, value in {
+            "title": title,
+            "source_id": source_id,
+            "canonical_url": canonical_url,
+        }.items()
+        if not value
+    ]
+    if missing:
+        raise MetadataProviderError(
+            "yt-dlp metadata is missing required field(s): " + ", ".join(missing)
+        )
+
+    yt_tags = info.get("tags")
+    tags = ["youtube", "metadata"]
+    if isinstance(yt_tags, list):
+        tags.extend(str(tag) for tag in yt_tags if isinstance(tag, str) and tag)
+
+    return VideoMetadata(
+        title=title,
+        platform="youtube",
+        source_url=source.raw_input,
+        author=_string_value(info.get("uploader")) or _string_value(info.get("channel")),
+        published_at=_format_upload_date(_string_value(info.get("upload_date"))),
+        duration=_format_duration(info.get("duration")),
+        language=_string_value(info.get("language")),
+        tags=tags,
+        status="metadata_only",
+        channel_id=_string_value(info.get("channel_id"))
+        or _string_value(info.get("uploader_id")),
+        source_id=source_id,
+        canonical_url=canonical_url,
+        thumbnail_url=_string_value(info.get("thumbnail")),
+        description=_string_value(info.get("description")),
+        raw_metadata=info,
+    )
+
+
+def _string_value(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
+def _format_upload_date(value: str) -> str:
+    if len(value) == 8 and value.isdigit():
+        return f"{value[:4]}-{value[4:6]}-{value[6:8]}"
+    return value
+
+
+def _format_duration(value: object) -> str:
+    if value is None:
+        return ""
+    try:
+        total_seconds = int(float(str(value)))
+    except ValueError:
+        return str(value)
+
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"

@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import contextlib
 import io
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from app.cli import main, run_import_url
 from app.downloader import get_mock_metadata, get_metadata_with_provider
-from app.errors import ProviderNotImplementedError
+from app.errors import MetadataProviderError, ProviderNotImplementedError
 from app.markdown_writer import render_markdown
 from app.pipeline import ImportPipelineOptions, run_import_pipeline
 from app.platform_adapter import get_platform_capabilities, resolve_video_source
@@ -67,11 +70,63 @@ class MockPipelineTests(unittest.TestCase):
         )
         self.assertTrue(result.segments)
 
-    def test_real_metadata_provider_boundary_is_explicitly_unimplemented(self) -> None:
+    def test_ytdlp_provider_does_not_affect_mock_flow_when_uninstalled(self) -> None:
         source = resolve_video_source("https://www.youtube.com/watch?v=mock")
 
-        with self.assertRaises(ProviderNotImplementedError):
+        with mock.patch.dict(sys.modules, {"yt_dlp": None}):
+            with self.assertRaises(MetadataProviderError):
+                get_metadata_with_provider(source, provider_name="yt-dlp")
+
+    def test_ytdlp_metadata_provider_maps_sanitized_info(self) -> None:
+        url = "https://www.youtube.com/watch?v=real123"
+        source = resolve_video_source(url)
+        raw_info = {
+            "id": "real123",
+            "title": "Real Metadata Title",
+            "uploader": "Example Uploader",
+            "channel_id": "UC123",
+            "description": "Long description",
+            "upload_date": "20260705",
+            "duration": 3723,
+            "thumbnail": "https://example.com/thumb.jpg",
+            "webpage_url": "https://www.youtube.com/watch?v=real123",
+            "language": "en",
+            "tags": ["ai", "metadata"],
+            "extra_field": {"nested": True},
+        }
+        fake_module, fake_ydl_class = _fake_ytdlp_module(raw_info)
+
+        with mock.patch.dict(sys.modules, {"yt_dlp": fake_module}):
+            metadata = get_metadata_with_provider(source, provider_name="yt-dlp")
+
+        instance = fake_ydl_class.instances[0]
+        self.assertEqual(instance.extract_calls, [(url, False)])
+        self.assertEqual(metadata.title, "Real Metadata Title")
+        self.assertEqual(metadata.platform, "youtube")
+        self.assertEqual(metadata.source_id, "real123")
+        self.assertEqual(metadata.canonical_url, "https://www.youtube.com/watch?v=real123")
+        self.assertEqual(metadata.author, "Example Uploader")
+        self.assertEqual(metadata.channel_id, "UC123")
+        self.assertEqual(metadata.description, "Long description")
+        self.assertEqual(metadata.published_at, "2026-07-05")
+        self.assertEqual(metadata.duration, "01:02:03")
+        self.assertEqual(metadata.thumbnail_url, "https://example.com/thumb.jpg")
+        self.assertEqual(metadata.status, "metadata_only")
+        self.assertIn("youtube", metadata.tags)
+        self.assertEqual(metadata.raw_metadata, raw_info)
+
+    def test_ytdlp_metadata_provider_rejects_non_youtube_source(self) -> None:
+        source = resolve_video_source("https://example.com/watch?v=real123")
+
+        with self.assertRaises(MetadataProviderError):
             get_metadata_with_provider(source, provider_name="yt-dlp")
+
+    def test_ytdlp_metadata_provider_reports_missing_dependency(self) -> None:
+        source = resolve_video_source("https://www.youtube.com/watch?v=real123")
+
+        with mock.patch.dict(sys.modules, {"yt_dlp": None}):
+            with self.assertRaises(MetadataProviderError):
+                get_metadata_with_provider(source, provider_name="yt-dlp")
 
     def test_real_transcript_provider_boundary_is_explicitly_unimplemented(self) -> None:
         metadata = get_mock_metadata("https://example.com/watch?v=mock")
@@ -90,13 +145,18 @@ class MockPipelineTests(unittest.TestCase):
             "title:",
             "platform:",
             "source_url:",
+            "canonical_url:",
+            "source_id:",
             "author:",
+            "channel_id:",
             "published_at:",
             "imported_at:",
             "duration:",
             "language:",
+            "thumbnail_url:",
             "tags:",
             "status:",
+            "description:",
         ]:
             self.assertIn(field, markdown)
 
@@ -109,6 +169,55 @@ class MockPipelineTests(unittest.TestCase):
             "## 原始转录（带时间戳）",
         ]:
             self.assertIn(section, markdown)
+
+    def test_render_markdown_does_not_include_raw_metadata(self) -> None:
+        metadata = get_mock_metadata("https://example.com/watch?v=mock")
+        metadata = type(metadata)(
+            **{
+                **metadata.__dict__,
+                "raw_metadata": {"debug_secret": "raw metadata should stay out"},
+            }
+        )
+        transcript = get_mock_transcript(metadata)
+        summary = summarize_mock(metadata, transcript)
+
+        markdown = render_markdown(metadata, transcript, summary)
+
+        self.assertNotIn("raw_metadata", markdown)
+        self.assertNotIn("debug_secret", markdown)
+        self.assertNotIn("raw metadata should stay out", markdown)
+
+    def test_render_markdown_description_uses_safe_yaml_block(self) -> None:
+        metadata = get_mock_metadata("https://example.com/watch?v=mock")
+        metadata = type(metadata)(
+            **{
+                **metadata.__dict__,
+                "description": "\n".join(
+                    [
+                        "Line one: has a colon",
+                        'Line two has "double quotes"',
+                        "URL: https://example.com/watch?v=mock",
+                        "# Heading-looking text",
+                        "- Markdown list item",
+                    ]
+                ),
+                "raw_metadata": {"debug_secret": "raw metadata should stay out"},
+            }
+        )
+        transcript = get_mock_transcript(metadata)
+        summary = summarize_mock(metadata, transcript)
+
+        markdown = render_markdown(metadata, transcript, summary)
+
+        self.assertIn("description: |-", markdown)
+        self.assertIn("  Line one: has a colon", markdown)
+        self.assertIn('  Line two has "double quotes"', markdown)
+        self.assertIn("  URL: https://example.com/watch?v=mock", markdown)
+        self.assertIn("  # Heading-looking text", markdown)
+        self.assertIn("  - Markdown list item", markdown)
+        self.assertNotIn("raw_metadata", markdown)
+        self.assertNotIn("debug_secret", markdown)
+        self.assertNotIn("raw metadata should stay out", markdown)
 
     def test_run_import_url_writes_markdown_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -162,7 +271,34 @@ class MockPipelineTests(unittest.TestCase):
                 )
 
         self.assertEqual(exit_code, 1)
-        self.assertIn("yt-dlp metadata provider is not implemented yet", stderr.getvalue())
+        self.assertIn("Error:", stderr.getvalue())
+        self.assertIn("yt-dlp metadata provider currently supports YouTube only", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+
+def _fake_ytdlp_module(raw_info: dict[str, object]):
+    class FakeYoutubeDL:
+        instances = []
+
+        def __init__(self, opts):
+            self.opts = opts
+            self.extract_calls = []
+            FakeYoutubeDL.instances.append(self)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def extract_info(self, url, download):
+            self.extract_calls.append((url, download))
+            return raw_info
+
+        def sanitize_info(self, info):
+            return info
+
+    return types.SimpleNamespace(YoutubeDL=FakeYoutubeDL), FakeYoutubeDL
 
 
 if __name__ == "__main__":

@@ -48,9 +48,9 @@ raw input
 - `transcript` records the future fallback order: official subtitles, transcript API, Whisper.
 - The CLI remains compatible with `python -m app.cli import-url ...`.
 
-Non-Mock provider boundaries now exist but intentionally raise explicit not-implemented errors:
+Non-Mock provider boundaries exist with narrow responsibilities:
 
-- Metadata provider placeholder: `yt-dlp`.
+- Metadata provider: `yt-dlp` for YouTube metadata only.
 - Transcript provider placeholder: `real-fallback`.
 
 Transcript fallback is intentionally not split into `OfficialSubtitleProvider`,
@@ -62,16 +62,36 @@ real subtitle stage, when provider-specific inputs and failure modes are known.
 - Local First.
 - CLI first, GUI later.
 - Keep modules decoupled.
+- Providers fetch data only and stay stateless.
+- Pipeline owns business orchestration.
+- CLI stays lightweight.
 - Prefer mature external infrastructure for media processing later.
 - Put project value in knowledge extraction and durable output.
 - Keep provider APIs replaceable.
 
+## v0.3.x Real Metadata
+
+`yt-dlp` is used only for metadata extraction:
+
+```text
+YouTube URL
+-> yt-dlp extract_info(download=False)
+-> sanitized metadata
+-> VideoMetadata
+-> Mock transcript
+-> Mock summary
+-> Markdown
+```
+
+This stage does not download media, fetch subtitles, run Whisper, call LLMs, or export to external systems. `raw_metadata` stores the sanitized provider payload for debugging and future mapping, but it is not rendered into Markdown frontmatter or body content.
+
 ## Future Real Providers
 
-- `yt-dlp` for video metadata and download.
+- `yt-dlp` for video metadata.
+- Future media download remains out of scope for `v0.3.x`.
 - `ffmpeg` for media processing.
 - `youtube-transcript-api` for transcript fallback.
 - `faster-whisper` for local transcription.
 - OpenAI-compatible, Anthropic, or Gemini APIs for LLM summarization.
 
-These providers are not used in Stage 1.
+Transcript, Whisper, and LLM providers remain out of scope for `v0.3.x`.

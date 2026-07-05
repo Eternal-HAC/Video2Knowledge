@@ -2,13 +2,19 @@
 title: "{{ title }}"
 platform: "{{ platform }}"
 source_url: "{{ source_url }}"
+canonical_url: "{{ canonical_url }}"
+source_id: "{{ source_id }}"
 author: "{{ author }}"
+channel_id: "{{ channel_id }}"
 published_at: "{{ published_at }}"
 imported_at: "{{ imported_at }}"
 duration: "{{ duration }}"
 language: "{{ language }}"
+thumbnail_url: "{{ thumbnail_url }}"
 tags: {{ tags }}
 status: "{{ status }}"
+description: |-
+{{ description }}
 ---
 
 # {{ title }}
@@ -36,4 +42,3 @@ status: "{{ status }}"
 ## 原始转录（带时间戳）
 
 {{ transcript }}
-

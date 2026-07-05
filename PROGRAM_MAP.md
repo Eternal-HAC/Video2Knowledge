@@ -8,7 +8,7 @@
 ## Pipeline Modules
 
 - `app/platform_adapter.py`: classifies URL or local file inputs, infers a platform label, and exposes platform capabilities.
-- `app/downloader.py`: metadata provider boundary with Mock implementation and `yt-dlp` placeholder. Does not download media.
+- `app/downloader.py`: metadata provider boundary with Mock implementation and YouTube `yt-dlp` metadata-only implementation. Does not download media.
 - `app/transcript.py`: transcript provider boundary with Mock implementation and real fallback placeholder. Does not fetch subtitles.
 - `app/errors.py`: shared project exceptions for explicit provider boundary failures.
 - `app/whisper.py`: placeholder for future local transcription. Does not run Whisper.

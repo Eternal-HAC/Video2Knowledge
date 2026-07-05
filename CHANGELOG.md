@@ -33,3 +33,10 @@
 - Updated roadmap to version-based milestones from `v0.1.x` through `v1.0`.
 - Updated project snapshot to `v0.2.0 Architecture Stable`.
 - Recorded the provider, pipeline, and CLI responsibility principle.
+
+## 2026-07-05
+
+- Added YouTube metadata-only provider implementation using `yt-dlp` API boundaries.
+- Added metadata mapping tests with mocked `yt_dlp`.
+- Declared `yt-dlp` dependency without installing it.
+- Kept transcript, summary, Markdown, and export paths Mock/local.

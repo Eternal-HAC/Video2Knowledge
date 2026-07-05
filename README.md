@@ -21,7 +21,7 @@ v0.2.0
 
 Architecture Stable.
 
-The next planned milestone is `v0.3.x Real Metadata`.
+The current milestone is `v0.3.x Real Metadata`.
 
 Implemented now:
 
@@ -34,6 +34,7 @@ Implemented now:
 - Import pipeline layer.
 - Platform capabilities.
 - Provider boundaries with explicit not-implemented errors.
+- Real YouTube metadata provider boundary using `yt-dlp` metadata-only mode.
 
 Not implemented yet:
 
@@ -70,6 +71,14 @@ source -> metadata -> transcript -> summary -> markdown -> export
 ```
 
 This keeps real provider code out of the CLI when YouTube metadata work starts.
+
+Real YouTube metadata is exposed through:
+
+```powershell
+python -m app.cli import-url "https://www.youtube.com/watch?v=VIDEO_ID" --metadata-provider yt-dlp --transcript-provider mock
+```
+
+This provider is metadata-only. It must not download video, audio, subtitles, or thumbnails. Installing `yt-dlp` and running a live YouTube smoke test are separate confirmation steps.
 
 ## Run Tests
 

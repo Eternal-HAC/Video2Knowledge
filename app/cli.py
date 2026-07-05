@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from app.errors import ProviderNotImplementedError
+from app.errors import MetadataProviderError, ProviderNotImplementedError
 from app.pipeline import ImportPipelineOptions, run_import_pipeline
 
 
@@ -71,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
                 metadata_provider=args.metadata_provider,
                 transcript_provider=args.transcript_provider,
             )
-        except (ProviderNotImplementedError, ValueError) as error:
+        except (MetadataProviderError, ProviderNotImplementedError, ValueError) as error:
             print(f"Error: {error}", file=sys.stderr)
             return 1
         print(f"Generated Markdown: {output_path}")

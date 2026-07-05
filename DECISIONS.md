@@ -152,3 +152,20 @@ Provider implementations stay easier to test and replace. CLI stays focused on u
 
 Follow-up Review:
 Revisit when the first real provider, YouTube metadata, is implemented.
+
+## 2026-07-05
+
+Decision:
+Implement `v0.3.x Real Metadata` as YouTube metadata only through `yt-dlp`, with no media download or transcript work.
+
+Reason:
+The first real provider should prove the metadata boundary and mapping before adding subtitles, Whisper, LLM, or export complexity.
+
+Alternatives:
+Use `yt-dlp` to download media, fetch subtitles, and populate multiple pipeline stages at once.
+
+Impact:
+The project gains its first real data capability while preserving the stage rule: one stage, one problem.
+
+Follow-up Review:
+After user-approved installation and live smoke testing, decide whether to tag `v0.3.0`.

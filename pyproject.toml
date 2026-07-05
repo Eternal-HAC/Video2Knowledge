@@ -8,11 +8,12 @@ version = "0.1.0"
 description = "Local First video-to-knowledge Markdown pipeline."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "yt-dlp>=2025.1.0",
+]
 
 [project.scripts]
 video2knowledge = "app.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
-

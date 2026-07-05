@@ -11,8 +11,10 @@
 - [x] Add pipeline layer so CLI does not own business orchestration.
 - [x] Add platform capabilities model before real provider integration.
 - [x] Tag architecture stable baseline as `v0.2.0`.
-- [ ] Plan `v0.3.x Real Metadata`.
-- [ ] Replace Mock metadata provider with real downloader-backed implementation.
+- [x] Plan `v0.3.x Real Metadata`.
+- [x] Implement YouTube metadata-only provider behind `yt-dlp`.
+- [ ] Install `yt-dlp` after user confirmation.
+- [ ] Run live YouTube metadata-only smoke test after user confirmation.
 - [ ] Add official subtitle acquisition.
 - [ ] Add transcript API fallback.
 - [ ] Add local Whisper fallback.

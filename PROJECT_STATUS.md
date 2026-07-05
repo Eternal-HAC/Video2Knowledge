@@ -68,3 +68,19 @@ Validation target:
 
 - Only Markdown documents are changed.
 - No product code changes.
+
+## 2026-07-05
+
+Status: `v0.3.x Real Metadata` implementation in progress.
+
+Changes:
+
+- Implement YouTube metadata-only provider through the `yt-dlp` Python API.
+- Keep transcript, summary, Markdown, and export on the existing Mock/local path.
+- Declare `yt-dlp` as a dependency without installing it in this stage.
+
+Validation target:
+
+- Unit tests use mocked `yt_dlp` and do not access the network.
+- Mock CLI regression still passes.
+- Live installation and YouTube smoke test remain separate confirmation steps.

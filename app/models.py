@@ -34,11 +34,12 @@ class VideoMetadata:
     language: str
     tags: list[str]
     status: str
+    channel_id: str = ""
     source_id: str = ""
     canonical_url: str = ""
     thumbnail_url: str = ""
     description: str = ""
-    raw_metadata: dict[str, str] | None = None
+    raw_metadata: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)

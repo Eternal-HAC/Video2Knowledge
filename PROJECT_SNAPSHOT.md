@@ -16,7 +16,7 @@ Video2Knowledge is a Local First AI/PKM tool that converts videos into structure
 
 ## Current Stage
 
-Architecture stable baseline completed. The next stage is `v0.3.x Real Metadata`.
+Architecture stable baseline completed. The current implementation stage is `v0.3.x Real Metadata`.
 
 ## Completed
 
@@ -27,14 +27,15 @@ Architecture stable baseline completed. The next stage is `v0.3.x Real Metadata`
 - Provider boundaries with explicit not-implemented errors for non-Mock providers.
 - Import pipeline layer that owns business orchestration.
 - Platform capabilities model.
+- YouTube metadata-only provider implementation prepared behind `yt-dlp`.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
 
 ## Not Yet Implemented
 
-- Real metadata provider.
-- Real YouTube metadata via `yt-dlp`.
+- Installed `yt-dlp` runtime dependency.
+- Live YouTube metadata smoke test.
 - Official transcript acquisition.
 - Transcript API fallback.
 - Whisper/faster-whisper.
@@ -55,8 +56,8 @@ Architecture stable baseline completed. The next stage is `v0.3.x Real Metadata`
 
 ## Next Steps
 
-1. Plan `v0.3.x Real Metadata`.
-2. Implement real YouTube metadata only after the plan is confirmed.
+1. Confirm whether to install `yt-dlp`.
+2. After installation and local tests pass, confirm whether to run a public YouTube metadata-only smoke test.
 3. Keep downloading, transcript, Whisper, LLM, and export work out of `v0.3.x`.
 
 ## Must Read Files for Continuation
