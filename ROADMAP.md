@@ -1,39 +1,70 @@
 # ROADMAP
 
-## Stage 1: Mock MVP
+## Version Roadmap
 
-- Create project structure.
-- Create project memory documents.
-- Implement CLI skeleton.
-- Define module interfaces.
-- Generate structured Markdown from Mock data.
-- Validate locally with tests and CLI run.
+### v0.1.x Project Bootstrap
 
-## Stage 2: Real Local Pipeline
+Status: Completed at `v0.1.0`.
 
-- Add platform adapter interface.
-- Support YouTube metadata and official subtitles.
-- Add transcript API fallback.
-- Add local video input path handling.
-- Add local Whisper fallback.
-- Add configurable Markdown and prompt templates.
-- Add Obsidian import workflow.
+- Project structure.
+- Project memory documents.
+- Mock CLI pipeline.
+- Platform adapter mock pipeline.
+- Provider boundaries.
 
-## Stage 3: Export and Batch Workflows
+### v0.2.x Architecture Stable
 
-- Add Notion export.
-- Add Feishu export.
-- Add batch import.
-- Add Git-friendly duplicate detection and update behavior.
+Status: Completed at `v0.2.0`.
 
-## Stage 4: MCP Server
+- Import pipeline layer.
+- Platform capabilities.
+- Thin CLI.
+- Provider and pipeline responsibility split.
 
-- Add an MCP server exposing an import command such as `Import_video_to_knowledge_base(url)`.
-- Keep processing in the local service.
+### v0.3.x Real Metadata
 
-## Stage 5: Browser Extension
+Status: Next planned stage.
 
-- Add import buttons on supported video platforms.
-- Extension sends URL only.
-- Local service performs processing.
+- Plan first.
+- Implement real YouTube metadata only.
+- Convert YouTube URL to `VideoMetadata`.
+- Do not download media.
+- Do not fetch transcript.
+- Do not run Whisper.
+- Do not call LLMs.
+- Do not export to knowledge systems.
 
+### v0.4.x Official Transcript
+
+- Add official transcript acquisition.
+- Keep transcript providers focused on data retrieval.
+- Do not add Whisper fallback in the same stage.
+
+### v0.5.x Whisper Fallback
+
+- Add local Whisper fallback only after transcript acquisition is stable.
+- Keep local transcription separate from metadata and LLM work.
+
+### v0.6.x Knowledge Extraction
+
+- Add configurable LLM summarization and extraction.
+- Keep provider calls behind clear boundaries.
+
+### v0.7.x Obsidian Export
+
+- Improve Obsidian local export workflow.
+- Add duplicate handling and note update behavior.
+
+### v0.8.x Notion / Feishu
+
+- Add optional Notion and Feishu export paths.
+- Keep local Markdown as the primary source of truth.
+
+### v0.9.x MCP
+
+- Add an MCP server exposing a local import command such as `Import_video_to_knowledge_base(url)`.
+
+### v1.0 Production Ready MVP
+
+- Stable local pipeline from supported source to structured Markdown.
+- Reliable validation for metadata, transcript, extraction, and export paths.

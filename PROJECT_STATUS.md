@@ -52,3 +52,19 @@ Validation target:
 - CLI remains compatible.
 - Mock pipeline still writes Markdown.
 - Unit tests pass.
+
+## 2026-07-05
+
+Status: Documentation synchronization stage in progress.
+
+Changes:
+
+- Record the development workflow in existing project memory documents.
+- Update roadmap to version-based milestones.
+- Update snapshot to `v0.2.0 Architecture Stable`.
+- Keep `CODEX_WORKFLOW.md` out of the document set to avoid workflow duplication.
+
+Validation target:
+
+- Only Markdown documents are changed.
+- No product code changes.

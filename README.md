@@ -13,9 +13,15 @@ video URL / local video
 -> Obsidian first, other exports later
 ```
 
-## Current Stage
+## Current Version
 
-This repository is in the first Mock MVP stage.
+v0.2.0
+
+## Current Development Stage
+
+Architecture Stable.
+
+The next planned milestone is `v0.3.x Real Metadata`.
 
 Implemented now:
 
@@ -25,8 +31,11 @@ Implemented now:
 - Mock summary generation.
 - Structured Markdown output.
 - Local file export for Obsidian-compatible Markdown.
+- Import pipeline layer.
+- Platform capabilities.
+- Provider boundaries with explicit not-implemented errors.
 
-Not implemented in this stage:
+Not implemented yet:
 
 - Real video download.
 - Real subtitle fetching.

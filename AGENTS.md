@@ -15,9 +15,37 @@
 Before changing scope or architecture:
 
 1. Read `README.md`, `PRD.md`, and this file.
-2. Check `PROJECT_STATUS.md` and `TODO.md`.
+2. Check `PROJECT_STATUS.md`, `TODO.md`, `DECISIONS.md`, and `PROGRAM_MAP.md`.
 3. Record design decisions in `DECISIONS.md`.
 4. Update `PROJECT_SNAPSHOT.md` at stage boundaries.
+
+## Development Workflow
+
+Every development stage follows:
+
+```text
+Plan -> Review -> Implement -> Validate -> Update Documentation -> Local Commit -> Review -> Push
+```
+
+- Plan first for medium or large changes.
+- Keep each stage small and focused.
+- Run tests or explain why validation cannot run.
+- Update related project memory documents with the implementation.
+- Commit locally after validation.
+- Wait for user confirmation before pushing.
+- Tag important architecture or release milestones.
+
+## Stage Definition
+
+A stage should:
+
+- Solve one problem only.
+- Be independently testable.
+- Produce one logical commit.
+- Update related documentation.
+- Be reviewable before push.
+
+Do not combine metadata, transcript, Whisper, LLM, export, and integration work into one stage.
 
 ## Validation
 
@@ -41,4 +69,3 @@ Never commit:
 - cookies
 - local settings
 - generated output files
-

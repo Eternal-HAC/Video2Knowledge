@@ -135,3 +135,20 @@ The transcript abstraction stays lightweight now, while the architecture documen
 
 Follow-up Review:
 Split the providers during the real subtitle stage.
+
+## 2026-07-05
+
+Decision:
+Keep real providers stateless and data-only; keep business orchestration in the pipeline and CLI lightweight.
+
+Reason:
+As provider count grows, business logic can easily scatter across metadata, transcript, Whisper, LLM, and export modules. Providers should fetch data and return typed results. The pipeline should decide how those results move through the workflow.
+
+Alternatives:
+Allow each provider to perform downstream behavior such as writing Markdown, calling LLMs, fetching unrelated data, or exporting notes.
+
+Impact:
+Provider implementations stay easier to test and replace. CLI stays focused on user input and output. Pipeline remains the single place for business flow.
+
+Follow-up Review:
+Revisit when the first real provider, YouTube metadata, is implemented.

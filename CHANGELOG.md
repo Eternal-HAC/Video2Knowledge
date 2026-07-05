@@ -26,3 +26,10 @@
 - Added platform capabilities for provider planning.
 - Added stable metadata fields for the upcoming real metadata stage.
 - Kept all provider behavior Mock-only.
+
+## 2026-07-05
+
+- Updated development workflow guidance in existing project documents.
+- Updated roadmap to version-based milestones from `v0.1.x` through `v1.0`.
+- Updated project snapshot to `v0.2.0 Architecture Stable`.
+- Recorded the provider, pipeline, and CLI responsibility principle.
