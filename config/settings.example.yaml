@@ -1,0 +1,23 @@
+# Video2Knowledge example settings.
+# Copy to config/settings.yaml for local use. Do not commit local settings.
+
+app:
+  stage: mock
+  output_dir: output/markdown
+
+mock:
+  platform: mock
+  language: zh-CN
+
+templates:
+  video_note: templates/video_note.md.j2
+
+exports:
+  obsidian_vault_path: ""
+
+providers:
+  downloader: mock
+  transcript: mock
+  whisper: disabled
+  llm: mock
+
