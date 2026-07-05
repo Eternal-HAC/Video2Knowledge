@@ -19,3 +19,10 @@
 - Added explicit metadata and transcript provider interfaces.
 - Added non-Mock provider placeholders for `yt-dlp` and transcript fallback.
 - Added CLI provider flags while keeping Mock providers as the default.
+
+## 2026-07-05
+
+- Added `app.pipeline` to own import orchestration.
+- Added platform capabilities for provider planning.
+- Added stable metadata fields for the upcoming real metadata stage.
+- Kept all provider behavior Mock-only.

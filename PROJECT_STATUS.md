@@ -36,3 +36,19 @@ Validation target:
 
 - Unit tests must still pass.
 - Existing Mock CLI command must remain compatible.
+
+## 2026-07-05
+
+Status: Architecture correction stage in progress.
+
+Changes:
+
+- Move business orchestration out of CLI and into `app.pipeline`.
+- Add platform capabilities before real YouTube metadata work.
+- Keep all providers Mock-only or explicitly not implemented.
+
+Validation target:
+
+- CLI remains compatible.
+- Mock pipeline still writes Markdown.
+- Unit tests pass.

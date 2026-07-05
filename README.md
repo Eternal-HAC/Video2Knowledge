@@ -54,6 +54,14 @@ python -m app.cli import-url "https://example.com/watch?v=mock" --metadata-provi
 
 Only `mock` providers are implemented. Non-Mock provider names are placeholders and fail with explicit not-implemented errors.
 
+The CLI delegates the business flow to `app.pipeline`. The pipeline owns:
+
+```text
+source -> metadata -> transcript -> summary -> markdown -> export
+```
+
+This keeps real provider code out of the CLI when YouTube metadata work starts.
+
 ## Run Tests
 
 ```powershell

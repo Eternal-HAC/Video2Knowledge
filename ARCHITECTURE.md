@@ -33,6 +33,7 @@ The current code defines the first replaceable boundaries without calling real p
 ```text
 raw input
 -> platform adapter
+-> platform capabilities
 -> metadata provider
 -> transcript provider strategy
 -> summarizer
@@ -41,6 +42,8 @@ raw input
 ```
 
 - `platform_adapter` classifies URL and local file inputs and infers platform labels.
+- `platform_adapter` exposes platform capabilities for provider planning.
+- `pipeline` owns the import business flow so CLI stays thin.
 - `downloader` exposes a metadata boundary that is still backed by Mock data.
 - `transcript` records the future fallback order: official subtitles, transcript API, Whisper.
 - The CLI remains compatible with `python -m app.cli import-url ...`.
@@ -49,6 +52,10 @@ Non-Mock provider boundaries now exist but intentionally raise explicit not-impl
 
 - Metadata provider placeholder: `yt-dlp`.
 - Transcript provider placeholder: `real-fallback`.
+
+Transcript fallback is intentionally not split into `OfficialSubtitleProvider`,
+`TranscriptApiProvider`, and `WhisperProvider` yet. That split belongs to the
+real subtitle stage, when provider-specific inputs and failure modes are known.
 
 ## Design Principles
 

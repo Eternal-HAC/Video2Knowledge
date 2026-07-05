@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import urlparse
 
-from app.models import VideoSource
+from app.models import PlatformCapabilities, VideoSource
 
 
 def resolve_video_source(raw_input: str) -> VideoSource:
@@ -30,6 +30,51 @@ def resolve_video_source(raw_input: str) -> VideoSource:
     )
 
 
+def get_platform_capabilities(platform: str) -> PlatformCapabilities:
+    """Return the known capabilities for a platform label."""
+
+    normalized = platform.lower()
+    if normalized == "youtube":
+        return PlatformCapabilities(
+            supports_metadata=True,
+            supports_transcript=True,
+            supports_local_file=False,
+            supports_cookies=True,
+            supports_auth=False,
+            metadata_providers=["mock", "yt-dlp"],
+            transcript_providers=["mock", "real-fallback"],
+        )
+    if normalized in {"bilibili", "tiktok", "vimeo", "coursera", "udemy"}:
+        return PlatformCapabilities(
+            supports_metadata=True,
+            supports_transcript=True,
+            supports_local_file=False,
+            supports_cookies=True,
+            supports_auth=True,
+            metadata_providers=["mock"],
+            transcript_providers=["mock"],
+        )
+    if normalized == "local":
+        return PlatformCapabilities(
+            supports_metadata=True,
+            supports_transcript=False,
+            supports_local_file=True,
+            supports_cookies=False,
+            supports_auth=False,
+            metadata_providers=["mock"],
+            transcript_providers=["mock"],
+        )
+    return PlatformCapabilities(
+        supports_metadata=False,
+        supports_transcript=False,
+        supports_local_file=False,
+        supports_cookies=False,
+        supports_auth=False,
+        metadata_providers=["mock"],
+        transcript_providers=["mock"],
+    )
+
+
 def _platform_from_host(host: str) -> str:
     normalized = host.lower()
     if "youtube.com" in normalized or "youtu.be" in normalized:
@@ -47,4 +92,3 @@ def _platform_from_host(host: str) -> str:
     if normalized:
         return normalized
     return Path(host).name or "unknown"
-

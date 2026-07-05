@@ -10,7 +10,8 @@ from app.cli import main, run_import_url
 from app.downloader import get_mock_metadata, get_metadata_with_provider
 from app.errors import ProviderNotImplementedError
 from app.markdown_writer import render_markdown
-from app.platform_adapter import resolve_video_source
+from app.pipeline import ImportPipelineOptions, run_import_pipeline
+from app.platform_adapter import get_platform_capabilities, resolve_video_source
 from app.summarizer import summarize_mock
 from app.transcript import (
     acquire_transcript_mock,
@@ -38,6 +39,21 @@ class MockPipelineTests(unittest.TestCase):
         metadata = get_metadata_with_provider(source)
 
         self.assertEqual(metadata.platform, "youtube")
+        self.assertEqual(metadata.source_id, "mock")
+        self.assertEqual(metadata.canonical_url, "https://www.youtube.com/watch?v=mock")
+
+    def test_platform_capabilities_describe_youtube_and_local(self) -> None:
+        youtube = get_platform_capabilities("youtube")
+        local = get_platform_capabilities("local")
+        unknown = get_platform_capabilities("unknown")
+
+        self.assertTrue(youtube.supports_metadata)
+        self.assertTrue(youtube.supports_transcript)
+        self.assertTrue(youtube.supports_cookies)
+        self.assertIn("yt-dlp", youtube.metadata_providers)
+        self.assertTrue(local.supports_local_file)
+        self.assertFalse(local.supports_cookies)
+        self.assertFalse(unknown.supports_metadata)
 
     def test_transcript_result_records_mock_strategy(self) -> None:
         metadata = get_mock_metadata("https://example.com/watch?v=mock")
@@ -101,6 +117,19 @@ class MockPipelineTests(unittest.TestCase):
             self.assertTrue(path.exists())
             self.assertEqual(path.suffix, ".md")
             self.assertIn("Mock Video Knowledge Note", path.read_text(encoding="utf-8"))
+
+    def test_pipeline_runs_complete_mock_flow(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = run_import_pipeline(
+                "https://www.youtube.com/watch?v=mock",
+                ImportPipelineOptions(output_dir=temp_dir),
+            )
+
+            self.assertEqual(result.source.platform, "youtube")
+            self.assertEqual(result.metadata.source_id, "mock")
+            self.assertEqual(result.transcript_result.provider, "mock_official_subtitles")
+            self.assertTrue(result.summary.one_sentence_summary)
+            self.assertTrue(result.output_path.exists())
 
     def test_cli_import_url_returns_success(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

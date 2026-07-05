@@ -101,3 +101,37 @@ Users and tests can see the planned replacement points, but only `mock` is valid
 
 Follow-up Review:
 Remove or revise placeholder behavior when `yt-dlp` metadata and the transcript fallback chain are implemented.
+
+## 2026-07-05
+
+Decision:
+Add a pipeline layer and platform capabilities before implementing YouTube metadata.
+
+Reason:
+Real provider integration should not make the CLI own business orchestration or platform-specific branching.
+
+Alternatives:
+Start `yt-dlp` integration directly inside the existing CLI flow.
+
+Impact:
+The CLI remains thin, provider replacement points stay centralized, and platform support can grow without immediate large rewrites.
+
+Follow-up Review:
+Revisit when YouTube metadata is implemented and the first real provider behavior is known.
+
+## 2026-07-05
+
+Decision:
+Delay splitting transcript fallback into separate real providers.
+
+Reason:
+The current stage is still Mock-only. Official subtitles, transcript API, and Whisper will have different inputs and failure modes that should be modeled when they are implemented.
+
+Alternatives:
+Create `OfficialSubtitleProvider`, `TranscriptApiProvider`, and `WhisperProvider` immediately.
+
+Impact:
+The transcript abstraction stays lightweight now, while the architecture document records the planned split.
+
+Follow-up Review:
+Split the providers during the real subtitle stage.

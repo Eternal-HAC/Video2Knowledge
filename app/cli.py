@@ -6,13 +6,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from app.downloader import get_metadata_with_provider
 from app.errors import ProviderNotImplementedError
-from app.exporter.obsidian import export_markdown
-from app.markdown_writer import render_markdown
-from app.platform_adapter import resolve_video_source
-from app.summarizer import summarize_mock
-from app.transcript import acquire_transcript_with_provider
+from app.pipeline import ImportPipelineOptions, run_import_pipeline
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -53,16 +48,15 @@ def run_import_url(
     metadata_provider: str = "mock",
     transcript_provider: str = "mock",
 ) -> Path:
-    source = resolve_video_source(url)
-    metadata = get_metadata_with_provider(source, provider_name=metadata_provider)
-    transcript_result = acquire_transcript_with_provider(
-        metadata,
-        provider_name=transcript_provider,
+    result = run_import_pipeline(
+        url,
+        ImportPipelineOptions(
+            output_dir=output_dir,
+            metadata_provider=metadata_provider,
+            transcript_provider=transcript_provider,
+        ),
     )
-    transcript = transcript_result.segments
-    summary = summarize_mock(metadata, transcript)
-    markdown = render_markdown(metadata, transcript, summary)
-    return export_markdown(markdown, metadata.title, output_dir)
+    return result.output_path
 
 
 def main(argv: list[str] | None = None) -> int:

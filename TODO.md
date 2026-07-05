@@ -8,6 +8,8 @@
 - [x] Add unit tests for Mock flow.
 - [x] Add platform adapter interface while keeping Mock metadata.
 - [x] Define real provider placeholders with explicit not-implemented errors.
+- [x] Add pipeline layer so CLI does not own business orchestration.
+- [x] Add platform capabilities model before real provider integration.
 - [ ] Replace Mock metadata provider with real downloader-backed implementation.
 - [ ] Add official subtitle acquisition.
 - [ ] Add transcript API fallback.

@@ -13,6 +13,17 @@ class VideoSource:
 
 
 @dataclass(frozen=True)
+class PlatformCapabilities:
+    supports_metadata: bool
+    supports_transcript: bool
+    supports_local_file: bool
+    supports_cookies: bool
+    supports_auth: bool
+    metadata_providers: list[str]
+    transcript_providers: list[str]
+
+
+@dataclass(frozen=True)
 class VideoMetadata:
     title: str
     platform: str
@@ -23,6 +34,11 @@ class VideoMetadata:
     language: str
     tags: list[str]
     status: str
+    source_id: str = ""
+    canonical_url: str = ""
+    thumbnail_url: str = ""
+    description: str = ""
+    raw_metadata: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
