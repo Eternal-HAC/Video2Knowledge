@@ -23,7 +23,7 @@ Status: Completed at `v0.2.0`.
 
 ### v0.3.x Real Metadata
 
-Status: Next planned stage.
+Status: Completed at `v0.3.0`.
 
 - Plan first.
 - Implement real YouTube metadata only.
@@ -36,7 +36,10 @@ Status: Next planned stage.
 
 ### v0.4.x Official Transcript
 
-- Add official transcript acquisition.
+- Status: In progress.
+- Add YouTube official transcript acquisition.
+- Support only official VTT/WebVTT subtitle tracks.
+- Do not use automatic captions.
 - Keep transcript providers focused on data retrieval.
 - Do not add Whisper fallback in the same stage.
 

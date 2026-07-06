@@ -84,3 +84,41 @@ Validation target:
 - Unit tests use mocked `yt_dlp` and do not access the network.
 - Mock CLI regression still passes.
 - Live installation and YouTube smoke test remain separate confirmation steps.
+
+## 2026-07-06
+
+Status: `v0.4.x Official Transcript` implementation in progress.
+
+Changes:
+
+- Add YouTube official subtitle provider for VTT/WebVTT tracks only.
+- Read official subtitle tracks from `yt-dlp` metadata `raw_metadata["subtitles"]`.
+- Keep automatic captions, transcript API fallback, Whisper, and LLMs out of this stage.
+- Keep transcript provider attempts stable with `yt_dlp_official_subtitles`.
+
+Validation target:
+
+- Unit tests mock subtitle fetching and do not access YouTube.
+- Mock CLI regression still passes.
+- Live official subtitle smoke test remains a separate confirmation step.
+
+## 2026-07-06
+
+Status: `v0.4.x Official Transcript` error boundary fix in progress.
+
+Findings:
+
+- TED video metadata-only screening found official subtitles with a `zh-CN` VTT/WebVTT track.
+- Full official subtitle smoke test reached the VTT text request step but received YouTube HTTP 429.
+- Browser access to YouTube also showed HTTP 429, so this is treated as current access environment or platform rate limiting.
+- This does not mean the selected video lacks official subtitles.
+
+Changes:
+
+- Wrap official subtitle VTT text fetch failures in `TranscriptProviderError`.
+- Keep errors sanitized so subtitle URLs, signatures, tokens, cookies, and temporary credentials are not exposed.
+
+Validation target:
+
+- CLI must print a concise `Error: official subtitle VTT fetch failed: ...` message without traceback.
+- Real VTT parsing smoke test remains pending until the network environment is no longer rate limited.

@@ -169,3 +169,37 @@ The project gains its first real data capability while preserving the stage rule
 
 Follow-up Review:
 After user-approved installation and live smoke testing, decide whether to tag `v0.3.0`.
+
+## 2026-07-06
+
+Decision:
+Implement `v0.4.x Official Transcript` as YouTube official VTT/WebVTT subtitles only.
+
+Reason:
+Official subtitles are the next reliable data source after metadata. Keeping this stage VTT/WebVTT-only avoids mixing transcript API fallback, automatic captions, Whisper, or format conversion into the first real transcript provider.
+
+Alternatives:
+Use automatic captions when official subtitles are missing, add `youtube-transcript-api`, parse json3/SRT/TTML/XML, or call Whisper in the same stage.
+
+Impact:
+The provider has a narrow contract: read official subtitle tracks from `yt-dlp` metadata, choose a supported VTT/WebVTT track, parse it into `TranscriptSegment`, and fail clearly when official VTT subtitles are unavailable.
+
+Follow-up Review:
+After local tests pass, run a user-approved live YouTube official subtitle smoke test before tagging `v0.4.0`.
+
+## 2026-07-06
+
+Decision:
+Sanitize official subtitle VTT fetch failures before they reach the CLI.
+
+Reason:
+Live validation can fail because of environment or platform rate limits such as YouTube HTTP 429. These failures should be reported clearly without leaking subtitle URLs, signatures, tokens, cookies, or temporary credentials.
+
+Alternatives:
+Expose raw urllib exceptions, retry automatically, use cookies or login state, or fall back to automatic captions.
+
+Impact:
+The provider keeps the same official VTT/WebVTT-only boundary while CLI errors remain concise and safe. Live VTT parsing validation can be retried later when rate limiting clears.
+
+Follow-up Review:
+Re-run the official subtitle smoke test only after user confirmation and a recovered network environment.

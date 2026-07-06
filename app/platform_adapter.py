@@ -42,7 +42,7 @@ def get_platform_capabilities(platform: str) -> PlatformCapabilities:
             supports_cookies=True,
             supports_auth=False,
             metadata_providers=["mock", "yt-dlp"],
-            transcript_providers=["mock", "real-fallback"],
+            transcript_providers=["mock", "official-subtitles", "real-fallback"],
         )
     if normalized in {"bilibili", "tiktok", "vimeo", "coursera", "udemy"}:
         return PlatformCapabilities(

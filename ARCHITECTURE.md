@@ -51,7 +51,8 @@ raw input
 Non-Mock provider boundaries exist with narrow responsibilities:
 
 - Metadata provider: `yt-dlp` for YouTube metadata only.
-- Transcript provider placeholder: `real-fallback`.
+- Transcript provider: `official-subtitles` for YouTube official VTT/WebVTT subtitles only.
+- Transcript provider placeholder: `real-fallback` for future fallback chains.
 
 Transcript fallback is intentionally not split into `OfficialSubtitleProvider`,
 `TranscriptApiProvider`, and `WhisperProvider` yet. That split belongs to the
@@ -95,3 +96,20 @@ This stage does not download media, fetch subtitles, run Whisper, call LLMs, or 
 - OpenAI-compatible, Anthropic, or Gemini APIs for LLM summarization.
 
 Transcript, Whisper, and LLM providers remain out of scope for `v0.3.x`.
+
+## v0.4.x Official Transcript
+
+Official subtitles are acquired from `VideoMetadata.raw_metadata["subtitles"]`, which is populated by the `yt-dlp` metadata provider:
+
+```text
+YouTube URL
+-> yt-dlp metadata
+-> official subtitles from raw_metadata
+-> VTT/WebVTT track selection
+-> VTT parser
+-> TranscriptResult
+-> Mock summary
+-> Markdown
+```
+
+This stage is intentionally VTT/WebVTT-only. It does not use `automatic_captions`, transcript API fallback, Whisper, LLMs, or subtitle file output. `attempted_providers` records only the stable provider id `yt_dlp_official_subtitles`.

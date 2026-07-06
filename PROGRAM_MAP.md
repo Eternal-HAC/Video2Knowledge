@@ -9,8 +9,8 @@
 
 - `app/platform_adapter.py`: classifies URL or local file inputs, infers a platform label, and exposes platform capabilities.
 - `app/downloader.py`: metadata provider boundary with Mock implementation and YouTube `yt-dlp` metadata-only implementation. Does not download media.
-- `app/transcript.py`: transcript provider boundary with Mock implementation and real fallback placeholder. Does not fetch subtitles.
-- `app/errors.py`: shared project exceptions for explicit provider boundary failures.
+- `app/transcript.py`: transcript provider boundary with Mock implementation, YouTube official VTT/WebVTT subtitles, and real fallback placeholder. Does not use automatic captions, transcript API fallback, or Whisper.
+- `app/errors.py`: shared project exceptions for explicit metadata and transcript provider failures.
 - `app/whisper.py`: placeholder for future local transcription. Does not run Whisper.
 - `app/summarizer.py`: returns Mock knowledge extraction output. Does not call LLMs.
 - `app/markdown_writer.py`: renders structured Markdown from metadata, transcript, and summary.

@@ -40,3 +40,16 @@
 - Added metadata mapping tests with mocked `yt_dlp`.
 - Declared `yt-dlp` dependency without installing it.
 - Kept transcript, summary, Markdown, and export paths Mock/local.
+
+## 2026-07-06
+
+- Added YouTube official subtitle provider for VTT/WebVTT tracks.
+- Added minimum WebVTT parser coverage for headers, cue ids, metadata blocks, cue settings, multiline text, tags, and entities.
+- Added transcript provider error handling in the CLI.
+- Kept automatic captions, transcript API fallback, Whisper, and LLM work out of this stage.
+
+## 2026-07-06
+
+- Added sanitized error handling for official subtitle VTT text fetch failures.
+- Covered HTTP 429, HTTP 403, network failures, timeouts, and unknown request failures in tests.
+- Recorded that TED metadata screening found official `zh-CN` VTT subtitles, while live VTT fetching was blocked by YouTube HTTP 429 in the current environment.

@@ -6,7 +6,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from app.errors import MetadataProviderError, ProviderNotImplementedError
+from app.errors import (
+    MetadataProviderError,
+    ProviderNotImplementedError,
+    TranscriptProviderError,
+)
 from app.pipeline import ImportPipelineOptions, run_import_pipeline
 
 
@@ -35,9 +39,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     import_url.add_argument(
         "--transcript-provider",
-        choices=["mock", "real-fallback"],
+        choices=["mock", "official-subtitles", "real-fallback"],
         default="mock",
-        help="Transcript provider to use. Only mock is implemented.",
+        help="Transcript provider to use. Official subtitles support YouTube VTT only.",
     )
     return parser
 
@@ -71,7 +75,12 @@ def main(argv: list[str] | None = None) -> int:
                 metadata_provider=args.metadata_provider,
                 transcript_provider=args.transcript_provider,
             )
-        except (MetadataProviderError, ProviderNotImplementedError, ValueError) as error:
+        except (
+            MetadataProviderError,
+            ProviderNotImplementedError,
+            TranscriptProviderError,
+            ValueError,
+        ) as error:
             print(f"Error: {error}", file=sys.stderr)
             return 1
         print(f"Generated Markdown: {output_path}")

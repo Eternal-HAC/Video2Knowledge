@@ -2,24 +2,34 @@ from __future__ import annotations
 
 import contextlib
 import io
+import socket
 import sys
 import tempfile
 import types
 import unittest
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from unittest import mock
 
 from app.cli import main, run_import_url
 from app.downloader import get_mock_metadata, get_metadata_with_provider
-from app.errors import MetadataProviderError, ProviderNotImplementedError
+from app.errors import (
+    MetadataProviderError,
+    ProviderNotImplementedError,
+    TranscriptProviderError,
+)
 from app.markdown_writer import render_markdown
 from app.pipeline import ImportPipelineOptions, run_import_pipeline
 from app.platform_adapter import get_platform_capabilities, resolve_video_source
 from app.summarizer import summarize_mock
 from app.transcript import (
+    OFFICIAL_SUBTITLE_PROVIDER_ID,
     acquire_transcript_mock,
     acquire_transcript_with_provider,
+    fetch_text,
     get_mock_transcript,
+    parse_vtt_segments,
+    select_official_vtt_track,
 )
 
 
@@ -54,6 +64,7 @@ class MockPipelineTests(unittest.TestCase):
         self.assertTrue(youtube.supports_transcript)
         self.assertTrue(youtube.supports_cookies)
         self.assertIn("yt-dlp", youtube.metadata_providers)
+        self.assertIn("official-subtitles", youtube.transcript_providers)
         self.assertTrue(local.supports_local_file)
         self.assertFalse(local.supports_cookies)
         self.assertFalse(unknown.supports_metadata)
@@ -133,6 +144,188 @@ class MockPipelineTests(unittest.TestCase):
 
         with self.assertRaises(ProviderNotImplementedError):
             acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+
+    def test_official_subtitle_provider_selects_priority_vtt_track(self) -> None:
+        metadata = _youtube_metadata_with_raw(
+            {
+                "subtitles": {
+                    "en": [{"ext": "vtt", "url": "https://example.com/en.vtt"}],
+                    "zh-CN": [{"ext": "vtt", "url": "https://example.com/zh.vtt"}],
+                }
+            }
+        )
+        vtt = """WEBVTT
+
+1
+00:00:01.000 --> 00:00:03.000
+Hello &amp; welcome
+"""
+
+        with mock.patch("app.transcript.fetch_text", return_value=vtt) as fetch_text:
+            result = acquire_transcript_with_provider(
+                metadata,
+                provider_name="official-subtitles",
+            )
+
+        fetch_text.assert_called_once_with("https://example.com/zh.vtt")
+        self.assertEqual(result.provider, OFFICIAL_SUBTITLE_PROVIDER_ID)
+        self.assertEqual(result.attempted_providers, [OFFICIAL_SUBTITLE_PROVIDER_ID])
+        self.assertEqual(result.segments[0].start, "00:00:01.000")
+        self.assertEqual(result.segments[0].end, "00:00:03.000")
+        self.assertEqual(result.segments[0].text, "Hello & welcome")
+
+    def test_official_subtitle_provider_ignores_automatic_captions(self) -> None:
+        metadata = _youtube_metadata_with_raw(
+            {
+                "automatic_captions": {
+                    "en": [{"ext": "vtt", "url": "https://example.com/auto.vtt"}],
+                }
+            }
+        )
+
+        with self.assertRaises(TranscriptProviderError):
+            acquire_transcript_with_provider(metadata, provider_name="official-subtitles")
+
+    def test_official_subtitle_provider_rejects_non_vtt_official_tracks(self) -> None:
+        metadata = _youtube_metadata_with_raw(
+            {
+                "subtitles": {
+                    "en": [{"ext": "json3", "url": "https://example.com/en.json3"}],
+                }
+            }
+        )
+
+        with self.assertRaises(TranscriptProviderError):
+            acquire_transcript_with_provider(metadata, provider_name="official-subtitles")
+
+    def test_official_subtitle_provider_rejects_non_youtube_metadata(self) -> None:
+        metadata = get_mock_metadata("https://example.com/watch?v=mock")
+
+        with self.assertRaises(TranscriptProviderError):
+            acquire_transcript_with_provider(metadata, provider_name="official-subtitles")
+
+    def test_select_official_vtt_track_falls_back_to_first_supported_language(self) -> None:
+        track = select_official_vtt_track(
+            {
+                "fr": [{"ext": "json3", "url": "https://example.com/fr.json3"}],
+                "de": [{"url": "https://example.com/de.vtt"}],
+            }
+        )
+
+        self.assertEqual(track, {"url": "https://example.com/de.vtt"})
+
+    def test_parse_vtt_segments_supports_minimum_webvtt_subset(self) -> None:
+        vtt = """WEBVTT
+Kind: captions
+
+NOTE this block should be skipped
+temporary note
+
+STYLE
+::cue { color: white }
+
+REGION
+id:fred
+
+1
+00:00:01.000 --> 00:00:03.500 align:start position:0%
+<v Speaker>Line one &amp; two
+continues here
+
+2
+00:00:04.000 --> 00:00:06.000
+Text with <b>bold</b> and&nbsp;entity
+"""
+
+        segments = parse_vtt_segments(vtt)
+
+        self.assertEqual(len(segments), 2)
+        self.assertEqual(segments[0].start, "00:00:01.000")
+        self.assertEqual(segments[0].end, "00:00:03.500")
+        self.assertEqual(segments[0].text, "Line one & two continues here")
+        self.assertEqual(segments[1].start, "00:00:04.000")
+        self.assertEqual(segments[1].end, "00:00:06.000")
+        self.assertEqual(segments[1].text, "Text with bold and entity")
+
+    def test_fetch_text_wraps_http_429_without_sensitive_url(self) -> None:
+        sensitive_url = "https://example.com/sub.vtt?signature=secret&token=hidden"
+        error = HTTPError(sensitive_url, 429, "Too Many Requests", hdrs=None, fp=None)
+
+        with mock.patch("app.transcript.urlopen", side_effect=error):
+            with self.assertRaises(TranscriptProviderError) as context:
+                fetch_text(sensitive_url)
+
+        message = str(context.exception)
+        self.assertEqual(
+            message,
+            "official subtitle VTT fetch failed: HTTP Error 429",
+        )
+        _assert_sensitive_subtitle_url_not_leaked(self, message)
+
+    def test_fetch_text_wraps_http_403(self) -> None:
+        error = HTTPError("https://example.com/sub.vtt", 403, "Forbidden", hdrs=None, fp=None)
+
+        with mock.patch("app.transcript.urlopen", side_effect=error):
+            with self.assertRaises(TranscriptProviderError) as context:
+                fetch_text("https://example.com/sub.vtt")
+
+        self.assertEqual(
+            str(context.exception),
+            "official subtitle VTT fetch failed: HTTP Error 403",
+        )
+
+    def test_fetch_text_wraps_url_error_without_raw_reason(self) -> None:
+        sensitive_url = "https://example.com/sub.vtt?signature=secret&token=hidden"
+
+        with mock.patch("app.transcript.urlopen", side_effect=URLError(sensitive_url)):
+            with self.assertRaises(TranscriptProviderError) as context:
+                fetch_text(sensitive_url)
+
+        message = str(context.exception)
+        self.assertEqual(
+            message,
+            "official subtitle VTT fetch failed: network request failed",
+        )
+        _assert_sensitive_subtitle_url_not_leaked(self, message)
+
+    def test_fetch_text_maps_url_error_socket_timeout_to_timeout(self) -> None:
+        sensitive_url = "https://example.com/sub.vtt?signature=secret&token=hidden"
+
+        with mock.patch(
+            "app.transcript.urlopen",
+            side_effect=URLError(socket.timeout("timed out with secret")),
+        ):
+            with self.assertRaises(TranscriptProviderError) as context:
+                fetch_text(sensitive_url)
+
+        message = str(context.exception)
+        self.assertEqual(
+            message,
+            "official subtitle VTT fetch failed: request timed out",
+        )
+        _assert_sensitive_subtitle_url_not_leaked(self, message)
+        self.assertNotIn("timed out with secret", message)
+
+    def test_fetch_text_wraps_timeout(self) -> None:
+        with mock.patch("app.transcript.urlopen", side_effect=TimeoutError()):
+            with self.assertRaises(TranscriptProviderError) as context:
+                fetch_text("https://example.com/sub.vtt")
+
+        self.assertEqual(
+            str(context.exception),
+            "official subtitle VTT fetch failed: request timed out",
+        )
+
+    def test_fetch_text_wraps_unknown_request_failure(self) -> None:
+        with mock.patch("app.transcript.urlopen", side_effect=RuntimeError("secret failure")):
+            with self.assertRaises(TranscriptProviderError) as context:
+                fetch_text("https://example.com/sub.vtt")
+
+        self.assertEqual(
+            str(context.exception),
+            "official subtitle VTT fetch failed: request failed",
+        )
+        self.assertNotIn("secret failure", str(context.exception))
 
     def test_render_markdown_contains_required_frontmatter_and_sections(self) -> None:
         metadata = get_mock_metadata("https://example.com/watch?v=mock")
@@ -275,6 +468,67 @@ class MockPipelineTests(unittest.TestCase):
         self.assertIn("yt-dlp metadata provider currently supports YouTube only", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
+    def test_cli_official_subtitle_error_returns_clear_error(self) -> None:
+        stderr = io.StringIO()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with contextlib.redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "import-url",
+                        "https://www.youtube.com/watch?v=mock",
+                        "--metadata-provider",
+                        "mock",
+                        "--transcript-provider",
+                        "official-subtitles",
+                        "--output-dir",
+                        temp_dir,
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Error:", stderr.getvalue())
+        self.assertIn("No official subtitles found", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_cli_official_subtitle_fetch_error_is_sanitized(self) -> None:
+        stderr = io.StringIO()
+        sensitive_url = "https://example.com/sub.vtt?signature=secret&token=hidden"
+        raw_metadata = {
+            "id": "real123",
+            "title": "Real Metadata Title",
+            "uploader": "Example Uploader",
+            "webpage_url": "https://www.youtube.com/watch?v=real123",
+            "subtitles": {
+                "zh-CN": [{"ext": "vtt", "url": sensitive_url}],
+            },
+        }
+        fake_module, _ = _fake_ytdlp_module(raw_metadata)
+        error = HTTPError(sensitive_url, 429, "Too Many Requests", hdrs=None, fp=None)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with mock.patch.dict(sys.modules, {"yt_dlp": fake_module}):
+                with mock.patch("app.transcript.urlopen", side_effect=error):
+                    with contextlib.redirect_stderr(stderr):
+                        exit_code = main(
+                            [
+                                "import-url",
+                                "https://www.youtube.com/watch?v=real123",
+                                "--metadata-provider",
+                                "yt-dlp",
+                                "--transcript-provider",
+                                "official-subtitles",
+                                "--output-dir",
+                                temp_dir,
+                            ]
+                        )
+
+        output = stderr.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Error: official subtitle VTT fetch failed: HTTP Error 429", output)
+        self.assertNotIn("Traceback", output)
+        _assert_sensitive_subtitle_url_not_leaked(self, output)
+
 
 def _fake_ytdlp_module(raw_info: dict[str, object]):
     class FakeYoutubeDL:
@@ -299,6 +553,35 @@ def _fake_ytdlp_module(raw_info: dict[str, object]):
             return info
 
     return types.SimpleNamespace(YoutubeDL=FakeYoutubeDL), FakeYoutubeDL
+
+
+def _youtube_metadata_with_raw(raw_metadata: dict[str, object]):
+    metadata = get_mock_metadata(
+        "https://www.youtube.com/watch?v=real123",
+        platform="youtube",
+    )
+    return type(metadata)(
+        **{
+            **metadata.__dict__,
+            "status": "metadata_only",
+            "source_id": "real123",
+            "raw_metadata": raw_metadata,
+        }
+    )
+
+
+def _assert_sensitive_subtitle_url_not_leaked(
+    test_case: unittest.TestCase,
+    output: str,
+) -> None:
+    for sensitive_value in [
+        "https://example.com/sub.vtt",
+        "signature",
+        "token",
+        "secret",
+        "hidden",
+    ]:
+        test_case.assertNotIn(sensitive_value, output)
 
 
 if __name__ == "__main__":

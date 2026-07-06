@@ -5,9 +5,11 @@
 - Project title and documentation name: `Video2Knowledge`.
 - Source package directory: `app/`.
 - Runtime target: Windows + PowerShell + Python 3.11+.
-- First stage must stay Mock-only.
 - Do not perform network installs unless the user explicitly approves.
-- Do not connect real APIs during the Mock MVP stage.
+- Do not run real provider live smoke tests unless the user explicitly approves.
+- Do not use cookies, login sessions, or authenticated access unless the user explicitly approves.
+- Do not download video, audio, subtitles, thumbnails, or other media artifacts unless the current stage explicitly allows it and the user confirms.
+- Each real provider live validation must be confirmed as a separate step.
 - Do not delete, move, or rename existing files unless the user explicitly asks.
 
 ## Development Loop

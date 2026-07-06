@@ -15,13 +15,13 @@ video URL / local video
 
 ## Current Version
 
-v0.2.0
+v0.3.0
 
 ## Current Development Stage
 
-Architecture Stable.
+YouTube Real Metadata completed.
 
-The current milestone is `v0.3.x Real Metadata`.
+The current milestone is `v0.4.x Official Transcript`.
 
 Implemented now:
 
@@ -35,18 +35,19 @@ Implemented now:
 - Platform capabilities.
 - Provider boundaries with explicit not-implemented errors.
 - Real YouTube metadata provider boundary using `yt-dlp` metadata-only mode.
+- YouTube official subtitle provider for VTT/WebVTT tracks.
 
 Not implemented yet:
 
 - Real video download.
-- Real subtitle fetching.
+- Automatic captions.
+- Transcript API fallback.
 - Whisper or faster-whisper transcription.
 - LLM calls.
-- Notion API.
-- Feishu API.
+- External knowledge base sync such as Notion or Feishu.
 - MCP server.
 - Browser extension.
-- Any real external API integration.
+- Live YouTube official subtitle smoke test.
 
 ## Run the Mock CLI
 
@@ -62,7 +63,7 @@ Provider flags exist to make the future replacement points explicit:
 python -m app.cli import-url "https://example.com/watch?v=mock" --metadata-provider mock --transcript-provider mock
 ```
 
-Only `mock` providers are implemented. Non-Mock provider names are placeholders and fail with explicit not-implemented errors.
+Mock providers remain the default local path. Real provider work is currently limited to YouTube metadata-only extraction and YouTube official VTT/WebVTT subtitles.
 
 The CLI delegates the business flow to `app.pipeline`. The pipeline owns:
 
@@ -70,7 +71,7 @@ The CLI delegates the business flow to `app.pipeline`. The pipeline owns:
 source -> metadata -> transcript -> summary -> markdown -> export
 ```
 
-This keeps real provider code out of the CLI when YouTube metadata work starts.
+This keeps real provider code out of the CLI as metadata and transcript providers are added.
 
 Real YouTube metadata is exposed through:
 
@@ -78,7 +79,15 @@ Real YouTube metadata is exposed through:
 python -m app.cli import-url "https://www.youtube.com/watch?v=VIDEO_ID" --metadata-provider yt-dlp --transcript-provider mock
 ```
 
-This provider is metadata-only. It must not download video, audio, subtitles, or thumbnails. Installing `yt-dlp` and running a live YouTube smoke test are separate confirmation steps.
+This provider is metadata-only. It must not download video, audio, subtitles, or thumbnails.
+
+YouTube official subtitles are exposed through:
+
+```powershell
+python -m app.cli import-url "https://www.youtube.com/watch?v=VIDEO_ID" --metadata-provider yt-dlp --transcript-provider official-subtitles
+```
+
+This provider only uses official VTT/WebVTT subtitle tracks from `yt-dlp` metadata. It does not use automatic captions, Transcript API fallback, Whisper, or LLMs. Live subtitle smoke testing remains a separate confirmation step.
 
 ## Run Tests
 
