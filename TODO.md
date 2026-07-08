@@ -24,7 +24,7 @@
 - [x] Define fallback policy and error taxonomy for Whisper fallback.
 - [x] Add mock Whisper fallback pipeline.
 - [x] Add mock audio acquisition and normalizer boundary.
-- [ ] Add cache/temp handling and explicit audio download confirmation.
+- [x] Add cache/temp handling and explicit audio download confirmation policy.
 - [ ] Add real audio acquisition and ffmpeg boundary.
 - [ ] Add faster-whisper backend.
 - [ ] Add transcript API fallback.

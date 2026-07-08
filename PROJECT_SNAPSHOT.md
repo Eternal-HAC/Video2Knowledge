@@ -33,6 +33,7 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 - Transcript fallback eligibility policy and error taxonomy for the upcoming Whisper fallback.
 - Mock Whisper fallback pipeline for eligible official subtitle failures.
 - Mock audio acquisition and normalization boundaries for the fallback path.
+- Cache/temp safety policy for future audio acquisition.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -63,12 +64,14 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 - Platform and network access failures must stop and must not trigger Whisper fallback.
 - `real-fallback` currently uses only Mock audio processing and Mock local Whisper; it does not download audio or run real Whisper.
 - `real-fallback` eligible cases pass through Mock audio and Mock normalizer boundaries only; they do not read or write media files.
+- Audio acquisition, media download, and keeping audio cache require explicit user confirmation per stage.
+- Signed URLs, cookies, tokens, auth headers, and sensitive query parameters must not be written to logs, Markdown, raw metadata, transcript results, or error messages.
 
 ## Next Steps
 
-1. Review and commit `v0.5.0c1 Mock Audio Processing Boundary`.
-2. Plan cache/temp handling and explicit audio download confirmation for `v0.5.0c2`.
-3. Keep real ffmpeg, faster-whisper, Transcript API fallback, LLM, and export work out of `v0.5.0c2`.
+1. Review and commit `v0.5.0c2 Cache/Temp Safety Policy`.
+2. Plan the real audio acquisition boundary with explicit download confirmation.
+3. Keep real ffmpeg, faster-whisper, Transcript API fallback, LLM, and export work out of the next audio boundary stage.
 
 ## Live Validation Notes
 

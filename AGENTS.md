@@ -9,6 +9,8 @@
 - Do not run real provider live smoke tests unless the user explicitly approves.
 - Do not use cookies, login sessions, or authenticated access unless the user explicitly approves.
 - Do not download video, audio, subtitles, thumbnails, or other media artifacts unless the current stage explicitly allows it and the user confirms.
+- Audio acquisition and media download require explicit user confirmation per stage.
+- Keeping audio cache also requires explicit user confirmation.
 - Each real provider live validation must be confirmed as a separate step.
 - Do not delete, move, or rename existing files unless the user explicitly asks.
 

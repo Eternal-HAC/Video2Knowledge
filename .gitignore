@@ -31,14 +31,52 @@ local_settings.*
 settings.local.*
 config/settings.yaml
 
-# Runtime outputs
+# Runtime outputs and caches
 output/
+cache/
+output/cache/
 logs/
 *.log
+
+# Runtime media artifacts
+output/**/*.mp4
+output/**/*.mkv
+output/**/*.webm
+output/**/*.mp3
+output/**/*.m4a
+output/**/*.wav
+output/**/*.aac
+output/**/*.opus
+output/**/*.flac
+output/**/*.vtt
+output/**/*.srt
+output/**/*.ass
+output/**/*.json3
+output/**/*.jpg
+output/**/*.jpeg
+output/**/*.png
+output/**/*.webp
+
+cache/**/*.mp4
+cache/**/*.mkv
+cache/**/*.webm
+cache/**/*.mp3
+cache/**/*.m4a
+cache/**/*.wav
+cache/**/*.aac
+cache/**/*.opus
+cache/**/*.flac
+cache/**/*.vtt
+cache/**/*.srt
+cache/**/*.ass
+cache/**/*.json3
+cache/**/*.jpg
+cache/**/*.jpeg
+cache/**/*.png
+cache/**/*.webp
 
 # Editors and OS
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
-

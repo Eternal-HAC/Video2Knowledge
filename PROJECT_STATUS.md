@@ -200,3 +200,19 @@ Validation target:
 
 - Unit tests cover mock audio and normalizer calls without network or media files.
 - Mock CLI regression still passes.
+
+## 2026-07-09
+
+Status: `v0.5.0c2 Cache/Temp Safety Policy` implementation in progress.
+
+Changes:
+
+- Add Git ignore guardrails for runtime cache and media artifacts under `output/` and `cache/`.
+- Record that audio acquisition, media download, and keeping audio cache require explicit user confirmation per stage.
+- Record that signed URLs, cookies, tokens, auth headers, and sensitive query parameters must not enter logs, Markdown, raw metadata, transcript results, or error messages.
+- Keep runtime behavior unchanged.
+
+Validation target:
+
+- Only documentation and `.gitignore` are changed.
+- Unit tests and Mock CLI regression still pass.

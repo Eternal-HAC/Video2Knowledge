@@ -271,3 +271,20 @@ Impact:
 
 Follow-up Review:
 Define cache/temp handling and explicit audio download confirmation before any real media acquisition is implemented.
+
+## 2026-07-09
+
+Decision:
+Restrict runtime cache and media artifact ignore rules to `output/` and `cache/`, and require explicit confirmation for audio acquisition, media download, and keeping audio cache.
+
+Reason:
+The project needs guardrails before real media work, but global media extension ignores would make it easy to accidentally exclude legitimate future fixtures or documentation assets.
+
+Alternatives:
+Ignore every media extension globally, or defer cache and media artifact policy until real audio download is implemented.
+
+Impact:
+Future runtime media outputs are protected from accidental commits while source assets outside runtime directories can still be intentionally tracked. Real audio acquisition remains opt-in and must not leak signed URLs, cookies, tokens, auth headers, or sensitive query parameters.
+
+Follow-up Review:
+Use this policy when adding the real audio acquisition boundary and future `--allow-audio-download` / `--keep-audio-cache` behavior.

@@ -80,3 +80,10 @@
 - Routed fallback-eligible `real-fallback` cases through Mock audio processing before Mock Whisper.
 - Kept `attempted_providers` focused on transcript providers without adding audio or normalizer ids.
 - Kept real audio download, ffmpeg execution, cache handling, CLI flags, and real Whisper execution out of this stage.
+
+## 2026-07-09
+
+- Added `.gitignore` guardrails for runtime cache and media artifacts under `output/` and `cache/`.
+- Documented explicit confirmation requirements for audio acquisition, media download, and keeping audio cache.
+- Documented signed URL, cookie, token, auth header, and sensitive query parameter redaction rules.
+- Kept runtime behavior unchanged.

@@ -144,3 +144,9 @@ official-subtitles
 ```
 
 The Mock audio provider and normalizer do not read local media, write audio files, download audio, check ffmpeg, or run ffmpeg. The Mock Whisper backend still does not call Whisper. Real audio acquisition, ffmpeg processing, and faster-whisper integration remain future stages.
+
+## v0.5.0c2 Cache/Temp Safety Policy
+
+Real audio acquisition remains disabled. Future audio download and audio cache retention require explicit user confirmation per stage. Runtime media artifacts belong only under `output/` or `cache/` paths and are ignored by Git.
+
+Signed media URLs, cookies, tokens, auth headers, and sensitive query parameters must not be written to logs, Markdown, `raw_metadata`, `TranscriptResult`, or error messages. Future audio and ffmpeg errors should report stable categories such as `audio download failed`, `audio processing failed`, or `ffmpeg not found` without exposing credentials or signed URLs.
