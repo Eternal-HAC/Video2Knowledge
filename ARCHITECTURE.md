@@ -113,3 +113,23 @@ YouTube URL
 ```
 
 This stage is intentionally VTT/WebVTT-only. It does not use `automatic_captions`, transcript API fallback, Whisper, LLMs, or subtitle file output. `attempted_providers` records only the stable provider id `yt_dlp_official_subtitles`.
+
+## v0.5.0a Fallback Policy
+
+The first Whisper fallback stage defines only error taxonomy and fallback eligibility:
+
+```text
+official-subtitles
+-> NoOfficialSubtitleError / UnsupportedSubtitleFormatError
+-> eligible for future Whisper fallback
+```
+
+Platform or network access failures do not mean subtitles are missing:
+
+```text
+HTTP 429 / HTTP 403 / timeout / network request failed
+-> PlatformAccessError or NetworkAccessError
+-> stop, do not enter Whisper fallback
+```
+
+`real-fallback` currently validates this policy and returns official subtitles when available. If fallback is eligible, it raises a clear not-implemented error instead of downloading audio or running Whisper. Audio acquisition, ffmpeg processing, and faster-whisper integration remain future stages.

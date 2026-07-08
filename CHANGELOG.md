@@ -60,3 +60,9 @@
 - Generated structured Markdown from official subtitles.
 - Confirmed no video, audio, subtitle, thumbnail, or other media artifacts were written to the project directory.
 - Marked `v0.4.x Official Transcript` ready for the `v0.4.0` tag.
+
+## 2026-07-08
+
+- Added transcript fallback error taxonomy for missing official subtitles, unsupported subtitle formats, platform access failures, and network access failures.
+- Added Whisper fallback eligibility policy without downloading audio or running Whisper.
+- Kept HTTP 429, HTTP 403, timeout, and network failures from triggering fallback.

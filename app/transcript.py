@@ -13,7 +13,14 @@ from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-from app.errors import ProviderNotImplementedError, TranscriptProviderError
+from app.errors import (
+    NetworkAccessError,
+    NoOfficialSubtitleError,
+    PlatformAccessError,
+    ProviderNotImplementedError,
+    TranscriptProviderError,
+    UnsupportedSubtitleFormatError,
+)
 from app.models import TranscriptResult, TranscriptSegment, VideoMetadata
 
 
@@ -47,10 +54,15 @@ class RealFallbackTranscriptProvider:
     name = "real-fallback"
 
     def acquire(self, metadata: VideoMetadata) -> TranscriptResult:
-        raise ProviderNotImplementedError(
-            "Real transcript fallback is not implemented yet. "
-            "Future order: official subtitles, transcript API, Whisper."
-        )
+        try:
+            return YtDlpOfficialSubtitleProvider().acquire(metadata)
+        except TranscriptProviderError as error:
+            if should_fallback_to_whisper(error):
+                raise ProviderNotImplementedError(
+                    "Whisper fallback is eligible but not implemented in this stage: "
+                    f"{_fallback_reason(error)}."
+                ) from error
+            raise
 
 
 class YtDlpOfficialSubtitleProvider:
@@ -58,7 +70,7 @@ class YtDlpOfficialSubtitleProvider:
 
     def acquire(self, metadata: VideoMetadata) -> TranscriptResult:
         if metadata.platform != "youtube":
-            raise TranscriptProviderError(
+            raise PlatformAccessError(
                 "Official subtitle provider currently supports YouTube only."
             )
         if not isinstance(metadata.raw_metadata, dict):
@@ -68,14 +80,14 @@ class YtDlpOfficialSubtitleProvider:
 
         subtitles = metadata.raw_metadata.get("subtitles")
         if not isinstance(subtitles, dict) or not subtitles:
-            raise TranscriptProviderError(
+            raise NoOfficialSubtitleError(
                 "No official subtitles found in yt-dlp metadata. "
                 "Automatic captions are not used in this stage."
             )
 
         track = select_official_vtt_track(subtitles)
         if track is None:
-            raise TranscriptProviderError(
+            raise UnsupportedSubtitleFormatError(
                 "Official subtitles were found, but no VTT/WebVTT track is supported."
             )
 
@@ -136,6 +148,12 @@ def build_transcript_provider(provider_name: str) -> TranscriptProvider:
     if normalized == "real-fallback":
         return RealFallbackTranscriptProvider()
     raise ValueError(f"Unknown transcript provider: {provider_name}")
+
+
+def should_fallback_to_whisper(error: TranscriptProviderError) -> bool:
+    """Return whether a transcript error is eligible for future Whisper fallback."""
+
+    return isinstance(error, (NoOfficialSubtitleError, UnsupportedSubtitleFormatError))
 
 
 def select_official_vtt_track(
@@ -224,23 +242,23 @@ def fetch_text(url: str) -> str:
             payload = response.read()
             charset = response.headers.get_content_charset() or "utf-8"
     except HTTPError as error:
-        raise TranscriptProviderError(
+        raise PlatformAccessError(
             f"official subtitle VTT fetch failed: HTTP Error {error.code}"
         ) from error
     except URLError as error:
         if isinstance(error.reason, TimeoutError | socket.timeout):
-            raise TranscriptProviderError(
+            raise NetworkAccessError(
                 "official subtitle VTT fetch failed: request timed out"
             ) from error
-        raise TranscriptProviderError(
+        raise NetworkAccessError(
             "official subtitle VTT fetch failed: network request failed"
         ) from error
     except TimeoutError as error:
-        raise TranscriptProviderError(
+        raise NetworkAccessError(
             "official subtitle VTT fetch failed: request timed out"
         ) from error
     except Exception as error:
-        raise TranscriptProviderError(
+        raise NetworkAccessError(
             "official subtitle VTT fetch failed: request failed"
         ) from error
     return payload.decode(charset, errors="replace")
@@ -290,3 +308,11 @@ def _string_value(value: object) -> str:
     if isinstance(value, str):
         return value
     return str(value)
+
+
+def _fallback_reason(error: TranscriptProviderError) -> str:
+    if isinstance(error, NoOfficialSubtitleError):
+        return "no official subtitles found"
+    if isinstance(error, UnsupportedSubtitleFormatError):
+        return "official subtitles have no VTT/WebVTT track"
+    return "transcript provider failed"

@@ -30,6 +30,7 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 - YouTube metadata-only provider implemented and validated behind `yt-dlp`.
 - YouTube official subtitle provider for VTT/WebVTT tracks.
 - Live official `zh-CN` VTT smoke test passed on a public TED video.
+- Transcript fallback eligibility policy and error taxonomy for the upcoming Whisper fallback.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -39,7 +40,8 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 ## Not Yet Implemented
 
 - Transcript API fallback.
-- Whisper/faster-whisper.
+- Whisper/faster-whisper execution.
+- Audio acquisition and ffmpeg processing.
 - LLM providers.
 - Obsidian automation.
 - Notion export.
@@ -55,12 +57,14 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 - Markdown remains the primary local output.
 - Do not combine metadata, transcript, Whisper, LLM, and export work in one stage.
 - Official subtitle provider uses only official VTT/WebVTT tracks and never automatic captions.
+- Only missing official subtitles and unsupported official subtitle formats are eligible for future Whisper fallback.
+- Platform and network access failures must stop and must not trigger Whisper fallback.
 
 ## Next Steps
 
-1. Tag `v0.4.0`.
-2. Plan `v0.5.x Whisper Fallback`, starting with fallback policy and error taxonomy.
-3. Keep Transcript API fallback, LLM, and export work out of the first Whisper stage.
+1. Review and commit `v0.5.0a Fallback Policy and Error Taxonomy`.
+2. Plan `v0.5.0b Mock Whisper Fallback Pipeline`.
+3. Keep audio download, ffmpeg, faster-whisper, Transcript API fallback, LLM, and export work out of `v0.5.0a`.
 
 ## Live Validation Notes
 

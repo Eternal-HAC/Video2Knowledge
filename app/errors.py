@@ -13,3 +13,19 @@ class MetadataProviderError(RuntimeError):
 
 class TranscriptProviderError(RuntimeError):
     """Raised when a transcript provider cannot return a valid transcript result."""
+
+
+class NoOfficialSubtitleError(TranscriptProviderError):
+    """Raised when a source has no official subtitles available."""
+
+
+class UnsupportedSubtitleFormatError(TranscriptProviderError):
+    """Raised when official subtitles exist but no supported format is available."""
+
+
+class PlatformAccessError(TranscriptProviderError):
+    """Raised when the platform refuses or restricts transcript access."""
+
+
+class NetworkAccessError(TranscriptProviderError):
+    """Raised when transcript access fails because of network conditions."""

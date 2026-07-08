@@ -142,3 +142,27 @@ Next target:
 
 - Prepare `v0.4.0` tag.
 - Plan `v0.5.x Whisper Fallback`, starting with fallback policy and error taxonomy.
+
+## 2026-07-08
+
+Status: `v0.5.0a Fallback Policy and Error Taxonomy` implementation in progress.
+
+Changes:
+
+- Add transcript error classes for fallback-eligible and access-failure cases.
+- Define Whisper fallback eligibility policy.
+- Keep `real-fallback` as a policy validator only; it does not download audio or run Whisper in this stage.
+- Preserve official subtitle behavior and automatic captions boundary.
+
+Policy:
+
+- Missing official subtitles can enter future Whisper fallback.
+- Official subtitles without VTT/WebVTT can enter future Whisper fallback.
+- Platform access failures such as HTTP 429 and HTTP 403 must stop.
+- Network access failures such as timeout and network request failure must stop.
+- Metadata contract errors must stop.
+
+Validation target:
+
+- Unit tests cover eligibility and non-eligibility cases without network access.
+- Mock CLI regression still passes.

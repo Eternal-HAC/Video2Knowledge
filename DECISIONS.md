@@ -220,3 +220,20 @@ The project keeps a clear staged architecture: source acquisition and transcript
 
 Follow-up Review:
 Revisit during or after `v0.6.x Knowledge Extraction`, after Whisper fallback and basic LLM extraction are stable.
+
+## 2026-07-08
+
+Decision:
+Only missing official subtitles and unsupported official subtitle formats are eligible for future Whisper fallback.
+
+Reason:
+Platform and network access failures are not evidence that a video lacks subtitles. Falling back to audio download when YouTube returns HTTP 429, HTTP 403, timeout, or network errors would blur provider errors with content absence and could trigger unintended media downloads.
+
+Alternatives:
+Treat every official subtitle failure as a reason to run Whisper, or keep all transcript failures under a single generic `TranscriptProviderError`.
+
+Impact:
+`v0.5.0a` defines `NoOfficialSubtitleError`, `UnsupportedSubtitleFormatError`, `PlatformAccessError`, and `NetworkAccessError`. `real-fallback` can validate the policy but still does not download audio or run Whisper.
+
+Follow-up Review:
+Use this policy in `v0.5.0b` when adding the mock Whisper fallback pipeline.

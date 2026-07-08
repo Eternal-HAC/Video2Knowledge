@@ -15,8 +15,12 @@ from app.cli import main, run_import_url
 from app.downloader import get_mock_metadata, get_metadata_with_provider
 from app.errors import (
     MetadataProviderError,
+    NetworkAccessError,
+    NoOfficialSubtitleError,
+    PlatformAccessError,
     ProviderNotImplementedError,
     TranscriptProviderError,
+    UnsupportedSubtitleFormatError,
 )
 from app.markdown_writer import render_markdown
 from app.pipeline import ImportPipelineOptions, run_import_pipeline
@@ -30,6 +34,7 @@ from app.transcript import (
     get_mock_transcript,
     parse_vtt_segments,
     select_official_vtt_track,
+    should_fallback_to_whisper,
 )
 
 
@@ -139,10 +144,10 @@ class MockPipelineTests(unittest.TestCase):
             with self.assertRaises(MetadataProviderError):
                 get_metadata_with_provider(source, provider_name="yt-dlp")
 
-    def test_real_transcript_provider_boundary_is_explicitly_unimplemented(self) -> None:
+    def test_real_fallback_preserves_non_youtube_platform_error(self) -> None:
         metadata = get_mock_metadata("https://example.com/watch?v=mock")
 
-        with self.assertRaises(ProviderNotImplementedError):
+        with self.assertRaises(PlatformAccessError):
             acquire_transcript_with_provider(metadata, provider_name="real-fallback")
 
     def test_official_subtitle_provider_selects_priority_vtt_track(self) -> None:
@@ -183,8 +188,9 @@ Hello &amp; welcome
             }
         )
 
-        with self.assertRaises(TranscriptProviderError):
+        with self.assertRaises(NoOfficialSubtitleError) as context:
             acquire_transcript_with_provider(metadata, provider_name="official-subtitles")
+        self.assertTrue(should_fallback_to_whisper(context.exception))
 
     def test_official_subtitle_provider_rejects_non_vtt_official_tracks(self) -> None:
         metadata = _youtube_metadata_with_raw(
@@ -195,14 +201,42 @@ Hello &amp; welcome
             }
         )
 
-        with self.assertRaises(TranscriptProviderError):
+        with self.assertRaises(UnsupportedSubtitleFormatError) as context:
             acquire_transcript_with_provider(metadata, provider_name="official-subtitles")
+        self.assertTrue(should_fallback_to_whisper(context.exception))
 
     def test_official_subtitle_provider_rejects_non_youtube_metadata(self) -> None:
         metadata = get_mock_metadata("https://example.com/watch?v=mock")
 
-        with self.assertRaises(TranscriptProviderError):
+        with self.assertRaises(PlatformAccessError) as context:
             acquire_transcript_with_provider(metadata, provider_name="official-subtitles")
+        self.assertFalse(should_fallback_to_whisper(context.exception))
+
+    def test_official_subtitle_provider_missing_subtitles_is_fallback_eligible(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+
+        with self.assertRaises(NoOfficialSubtitleError) as context:
+            acquire_transcript_with_provider(metadata, provider_name="official-subtitles")
+
+        self.assertTrue(should_fallback_to_whisper(context.exception))
+
+    def test_official_subtitle_provider_empty_subtitles_is_fallback_eligible(self) -> None:
+        metadata = _youtube_metadata_with_raw({"subtitles": {}})
+
+        with self.assertRaises(NoOfficialSubtitleError) as context:
+            acquire_transcript_with_provider(metadata, provider_name="official-subtitles")
+
+        self.assertTrue(should_fallback_to_whisper(context.exception))
+
+    def test_official_subtitle_provider_raw_metadata_contract_error_is_not_fallback(self) -> None:
+        metadata = get_mock_metadata("https://www.youtube.com/watch?v=mock", platform="youtube")
+        metadata = type(metadata)(**{**metadata.__dict__, "raw_metadata": None})
+
+        with self.assertRaises(TranscriptProviderError) as context:
+            acquire_transcript_with_provider(metadata, provider_name="official-subtitles")
+
+        self.assertNotIsInstance(context.exception, NoOfficialSubtitleError)
+        self.assertFalse(should_fallback_to_whisper(context.exception))
 
     def test_select_official_vtt_track_falls_back_to_first_supported_language(self) -> None:
         track = select_official_vtt_track(
@@ -252,7 +286,7 @@ Text with <b>bold</b> and&nbsp;entity
         error = HTTPError(sensitive_url, 429, "Too Many Requests", hdrs=None, fp=None)
 
         with mock.patch("app.transcript.urlopen", side_effect=error):
-            with self.assertRaises(TranscriptProviderError) as context:
+            with self.assertRaises(PlatformAccessError) as context:
                 fetch_text(sensitive_url)
 
         message = str(context.exception)
@@ -261,24 +295,26 @@ Text with <b>bold</b> and&nbsp;entity
             "official subtitle VTT fetch failed: HTTP Error 429",
         )
         _assert_sensitive_subtitle_url_not_leaked(self, message)
+        self.assertFalse(should_fallback_to_whisper(context.exception))
 
     def test_fetch_text_wraps_http_403(self) -> None:
         error = HTTPError("https://example.com/sub.vtt", 403, "Forbidden", hdrs=None, fp=None)
 
         with mock.patch("app.transcript.urlopen", side_effect=error):
-            with self.assertRaises(TranscriptProviderError) as context:
+            with self.assertRaises(PlatformAccessError) as context:
                 fetch_text("https://example.com/sub.vtt")
 
         self.assertEqual(
             str(context.exception),
             "official subtitle VTT fetch failed: HTTP Error 403",
         )
+        self.assertFalse(should_fallback_to_whisper(context.exception))
 
     def test_fetch_text_wraps_url_error_without_raw_reason(self) -> None:
         sensitive_url = "https://example.com/sub.vtt?signature=secret&token=hidden"
 
         with mock.patch("app.transcript.urlopen", side_effect=URLError(sensitive_url)):
-            with self.assertRaises(TranscriptProviderError) as context:
+            with self.assertRaises(NetworkAccessError) as context:
                 fetch_text(sensitive_url)
 
         message = str(context.exception)
@@ -287,6 +323,7 @@ Text with <b>bold</b> and&nbsp;entity
             "official subtitle VTT fetch failed: network request failed",
         )
         _assert_sensitive_subtitle_url_not_leaked(self, message)
+        self.assertFalse(should_fallback_to_whisper(context.exception))
 
     def test_fetch_text_maps_url_error_socket_timeout_to_timeout(self) -> None:
         sensitive_url = "https://example.com/sub.vtt?signature=secret&token=hidden"
@@ -295,7 +332,7 @@ Text with <b>bold</b> and&nbsp;entity
             "app.transcript.urlopen",
             side_effect=URLError(socket.timeout("timed out with secret")),
         ):
-            with self.assertRaises(TranscriptProviderError) as context:
+            with self.assertRaises(NetworkAccessError) as context:
                 fetch_text(sensitive_url)
 
         message = str(context.exception)
@@ -305,20 +342,22 @@ Text with <b>bold</b> and&nbsp;entity
         )
         _assert_sensitive_subtitle_url_not_leaked(self, message)
         self.assertNotIn("timed out with secret", message)
+        self.assertFalse(should_fallback_to_whisper(context.exception))
 
     def test_fetch_text_wraps_timeout(self) -> None:
         with mock.patch("app.transcript.urlopen", side_effect=TimeoutError()):
-            with self.assertRaises(TranscriptProviderError) as context:
+            with self.assertRaises(NetworkAccessError) as context:
                 fetch_text("https://example.com/sub.vtt")
 
         self.assertEqual(
             str(context.exception),
             "official subtitle VTT fetch failed: request timed out",
         )
+        self.assertFalse(should_fallback_to_whisper(context.exception))
 
     def test_fetch_text_wraps_unknown_request_failure(self) -> None:
         with mock.patch("app.transcript.urlopen", side_effect=RuntimeError("secret failure")):
-            with self.assertRaises(TranscriptProviderError) as context:
+            with self.assertRaises(NetworkAccessError) as context:
                 fetch_text("https://example.com/sub.vtt")
 
         self.assertEqual(
@@ -326,6 +365,63 @@ Text with <b>bold</b> and&nbsp;entity
             "official subtitle VTT fetch failed: request failed",
         )
         self.assertNotIn("secret failure", str(context.exception))
+        self.assertFalse(should_fallback_to_whisper(context.exception))
+
+    def test_official_subtitle_no_cues_is_not_fallback_eligible(self) -> None:
+        metadata = _youtube_metadata_with_raw(
+            {"subtitles": {"zh-CN": [{"ext": "vtt", "url": "https://example.com/zh.vtt"}]}}
+        )
+
+        with mock.patch("app.transcript.fetch_text", return_value="WEBVTT\n\n"):
+            with self.assertRaises(TranscriptProviderError) as context:
+                acquire_transcript_with_provider(metadata, provider_name="official-subtitles")
+
+        self.assertFalse(should_fallback_to_whisper(context.exception))
+
+    def test_real_fallback_reports_eligible_no_subtitles_without_running_whisper(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+
+        with self.assertRaises(ProviderNotImplementedError) as context:
+            acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+
+        self.assertIn(
+            "Whisper fallback is eligible but not implemented in this stage: "
+            "no official subtitles found.",
+            str(context.exception),
+        )
+
+    def test_real_fallback_reports_eligible_unsupported_subtitle_format(self) -> None:
+        metadata = _youtube_metadata_with_raw(
+            {"subtitles": {"en": [{"ext": "json3", "url": "https://example.com/en.json3"}]}}
+        )
+
+        with self.assertRaises(ProviderNotImplementedError) as context:
+            acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+
+        self.assertIn(
+            "Whisper fallback is eligible but not implemented in this stage: "
+            "official subtitles have no VTT/WebVTT track.",
+            str(context.exception),
+        )
+
+    def test_real_fallback_preserves_platform_access_error(self) -> None:
+        metadata = _youtube_metadata_with_raw(
+            {"subtitles": {"zh-CN": [{"ext": "vtt", "url": "https://example.com/zh.vtt"}]}}
+        )
+        error = HTTPError("https://example.com/zh.vtt", 429, "Too Many Requests", None, None)
+
+        with mock.patch("app.transcript.urlopen", side_effect=error):
+            with self.assertRaises(PlatformAccessError):
+                acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+
+    def test_real_fallback_preserves_network_access_error(self) -> None:
+        metadata = _youtube_metadata_with_raw(
+            {"subtitles": {"zh-CN": [{"ext": "vtt", "url": "https://example.com/zh.vtt"}]}}
+        )
+
+        with mock.patch("app.transcript.urlopen", side_effect=URLError("network secret")):
+            with self.assertRaises(NetworkAccessError):
+                acquire_transcript_with_provider(metadata, provider_name="real-fallback")
 
     def test_render_markdown_contains_required_frontmatter_and_sections(self) -> None:
         metadata = get_mock_metadata("https://example.com/watch?v=mock")

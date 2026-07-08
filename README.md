@@ -37,13 +37,15 @@ Implemented now:
 - Real YouTube metadata provider boundary using `yt-dlp` metadata-only mode.
 - YouTube official subtitle provider for VTT/WebVTT tracks.
 - Verified YouTube official `zh-CN` VTT smoke test on a public TED video.
+- Transcript fallback error taxonomy and Whisper fallback eligibility policy.
 
 Not implemented yet:
 
 - Real video download.
 - Automatic captions.
 - Transcript API fallback.
-- Whisper or faster-whisper transcription.
+- Whisper or faster-whisper transcription execution.
+- Audio acquisition and ffmpeg processing.
 - LLM calls.
 - External knowledge base sync such as Notion or Feishu.
 - MCP server.
@@ -88,6 +90,8 @@ python -m app.cli import-url "https://www.youtube.com/watch?v=VIDEO_ID" --metada
 ```
 
 This provider only uses official VTT/WebVTT subtitle tracks from `yt-dlp` metadata. It does not use automatic captions, Transcript API fallback, Whisper, or LLMs. A live smoke test has verified official `zh-CN` VTT subtitles on a public TED video.
+
+`real-fallback` currently validates fallback policy only. Missing official subtitles and unsupported official subtitle formats are eligible for future Whisper fallback. Platform and network access failures such as HTTP 429, HTTP 403, timeout, and network request failure are not eligible and must stop. The actual Whisper backend and audio acquisition remain future work.
 
 ## Run Tests
 
