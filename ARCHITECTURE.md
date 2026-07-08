@@ -132,4 +132,13 @@ HTTP 429 / HTTP 403 / timeout / network request failed
 -> stop, do not enter Whisper fallback
 ```
 
-`real-fallback` currently validates this policy and returns official subtitles when available. If fallback is eligible, it raises a clear not-implemented error instead of downloading audio or running Whisper. Audio acquisition, ffmpeg processing, and faster-whisper integration remain future stages.
+`real-fallback` validates this policy and returns official subtitles when available. If fallback is eligible, it enters a deterministic Mock local Whisper backend:
+
+```text
+official-subtitles
+-> NoOfficialSubtitleError / UnsupportedSubtitleFormatError
+-> local_whisper_mock
+-> TranscriptResult
+```
+
+The Mock backend does not read local media, download audio, run ffmpeg, or call Whisper. Audio acquisition, ffmpeg processing, and faster-whisper integration remain future stages.

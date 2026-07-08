@@ -46,6 +46,7 @@ Status: Completed at `v0.3.0`.
 ### v0.5.x Whisper Fallback
 
 - Start with fallback policy and error taxonomy.
+- Add a Mock Whisper fallback pipeline before real media work.
 - Add local Whisper fallback only after transcript acquisition is stable.
 - Keep local transcription separate from metadata and LLM work.
 - Require explicit future confirmation before audio acquisition or dependency installation.

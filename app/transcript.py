@@ -17,11 +17,11 @@ from app.errors import (
     NetworkAccessError,
     NoOfficialSubtitleError,
     PlatformAccessError,
-    ProviderNotImplementedError,
     TranscriptProviderError,
     UnsupportedSubtitleFormatError,
 )
 from app.models import TranscriptResult, TranscriptSegment, VideoMetadata
+from app.whisper import LOCAL_WHISPER_MOCK_PROVIDER_ID, MockWhisperBackend
 
 
 TRANSCRIPT_PROVIDER_ORDER = [
@@ -58,10 +58,15 @@ class RealFallbackTranscriptProvider:
             return YtDlpOfficialSubtitleProvider().acquire(metadata)
         except TranscriptProviderError as error:
             if should_fallback_to_whisper(error):
-                raise ProviderNotImplementedError(
-                    "Whisper fallback is eligible but not implemented in this stage: "
-                    f"{_fallback_reason(error)}."
-                ) from error
+                result = MockWhisperBackend().transcribe(metadata)
+                return TranscriptResult(
+                    segments=result.segments,
+                    provider=LOCAL_WHISPER_MOCK_PROVIDER_ID,
+                    attempted_providers=[
+                        OFFICIAL_SUBTITLE_PROVIDER_ID,
+                        LOCAL_WHISPER_MOCK_PROVIDER_ID,
+                    ],
+                )
             raise
 
 

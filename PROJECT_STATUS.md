@@ -166,3 +166,20 @@ Validation target:
 
 - Unit tests cover eligibility and non-eligibility cases without network access.
 - Mock CLI regression still passes.
+
+## 2026-07-08
+
+Status: `v0.5.0b Mock Whisper Fallback Pipeline` implementation in progress.
+
+Changes:
+
+- Add a deterministic Mock local Whisper backend.
+- Make `real-fallback` return official subtitles when available.
+- Make `real-fallback` enter Mock Whisper only for missing official subtitles or unsupported official subtitle formats.
+- Keep platform access failures, network failures, and generic transcript failures from entering fallback.
+- Keep audio acquisition, ffmpeg processing, and real Whisper execution out of this stage.
+
+Validation target:
+
+- Unit tests cover official success, eligible fallback, non-eligible failures, stable attempted providers, and Mock Whisper output.
+- Mock CLI regression still passes.

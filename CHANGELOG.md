@@ -66,3 +66,10 @@
 - Added transcript fallback error taxonomy for missing official subtitles, unsupported subtitle formats, platform access failures, and network access failures.
 - Added Whisper fallback eligibility policy without downloading audio or running Whisper.
 - Kept HTTP 429, HTTP 403, timeout, and network failures from triggering fallback.
+
+## 2026-07-08
+
+- Added a deterministic Mock local Whisper backend.
+- Updated `real-fallback` to return official subtitles when available and use Mock Whisper only for fallback-eligible subtitle absence or unsupported subtitle formats.
+- Preserved stop behavior for platform access, network access, and generic transcript provider failures.
+- Kept audio acquisition, ffmpeg processing, and real Whisper execution out of this stage.

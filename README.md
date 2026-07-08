@@ -38,14 +38,15 @@ Implemented now:
 - YouTube official subtitle provider for VTT/WebVTT tracks.
 - Verified YouTube official `zh-CN` VTT smoke test on a public TED video.
 - Transcript fallback error taxonomy and Whisper fallback eligibility policy.
+- Mock Whisper fallback pipeline for eligible official subtitle failures.
 
 Not implemented yet:
 
 - Real video download.
 - Automatic captions.
 - Transcript API fallback.
-- Whisper or faster-whisper transcription execution.
 - Audio acquisition and ffmpeg processing.
+- Real Whisper or faster-whisper transcription execution.
 - LLM calls.
 - External knowledge base sync such as Notion or Feishu.
 - MCP server.
@@ -91,7 +92,7 @@ python -m app.cli import-url "https://www.youtube.com/watch?v=VIDEO_ID" --metada
 
 This provider only uses official VTT/WebVTT subtitle tracks from `yt-dlp` metadata. It does not use automatic captions, Transcript API fallback, Whisper, or LLMs. A live smoke test has verified official `zh-CN` VTT subtitles on a public TED video.
 
-`real-fallback` currently validates fallback policy only. Missing official subtitles and unsupported official subtitle formats are eligible for future Whisper fallback. Platform and network access failures such as HTTP 429, HTTP 403, timeout, and network request failure are not eligible and must stop. The actual Whisper backend and audio acquisition remain future work.
+`real-fallback` first tries official VTT/WebVTT subtitles. Missing official subtitles and unsupported official subtitle formats enter a deterministic Mock local Whisper backend. Platform and network access failures such as HTTP 429, HTTP 403, timeout, and network request failure are not eligible and must stop. Audio acquisition, ffmpeg processing, and real Whisper execution remain future work.
 
 ## Run Tests
 

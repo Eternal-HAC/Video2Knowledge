@@ -22,7 +22,7 @@
 - [x] Run live YouTube official subtitle smoke test after HTTP 429 rate limit clears.
 - [x] Plan `v0.5.x Whisper Fallback`.
 - [x] Define fallback policy and error taxonomy for Whisper fallback.
-- [ ] Add mock Whisper fallback pipeline.
+- [x] Add mock Whisper fallback pipeline.
 - [ ] Add audio acquisition and ffmpeg boundary.
 - [ ] Add faster-whisper backend.
 - [ ] Add transcript API fallback.

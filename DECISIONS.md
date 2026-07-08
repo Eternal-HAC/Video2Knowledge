@@ -237,3 +237,20 @@ Impact:
 
 Follow-up Review:
 Use this policy in `v0.5.0b` when adding the mock Whisper fallback pipeline.
+
+## 2026-07-08
+
+Decision:
+Use a deterministic Mock local Whisper backend before adding audio acquisition, ffmpeg, or real Whisper execution.
+
+Reason:
+The fallback orchestration should be validated separately from media download, local processing dependencies, model installation, and transcription runtime behavior.
+
+Alternatives:
+Connect `real-fallback` directly to audio download and faster-whisper after the fallback policy stage.
+
+Impact:
+`real-fallback` can now prove the official-subtitles-to-Whisper control flow while remaining fully local, deterministic, and dependency-free. Audio acquisition and real transcription remain separate stages.
+
+Follow-up Review:
+Use the stable Mock fallback path when designing the audio acquisition and ffmpeg boundary.

@@ -18,7 +18,6 @@ from app.errors import (
     NetworkAccessError,
     NoOfficialSubtitleError,
     PlatformAccessError,
-    ProviderNotImplementedError,
     TranscriptProviderError,
     UnsupportedSubtitleFormatError,
 )
@@ -36,6 +35,7 @@ from app.transcript import (
     select_official_vtt_track,
     should_fallback_to_whisper,
 )
+from app.whisper import LOCAL_WHISPER_MOCK_PROVIDER_ID, MockWhisperBackend
 
 
 class MockPipelineTests(unittest.TestCase):
@@ -378,31 +378,66 @@ Text with <b>bold</b> and&nbsp;entity
 
         self.assertFalse(should_fallback_to_whisper(context.exception))
 
-    def test_real_fallback_reports_eligible_no_subtitles_without_running_whisper(self) -> None:
+    def test_real_fallback_returns_official_subtitles_without_mock_whisper(self) -> None:
+        metadata = _youtube_metadata_with_raw(
+            {"subtitles": {"zh-CN": [{"ext": "vtt", "url": "https://example.com/zh.vtt"}]}}
+        )
+        vtt = """WEBVTT
+
+00:00:01.000 --> 00:00:03.000
+Official subtitle text
+"""
+
+        with mock.patch("app.transcript.fetch_text", return_value=vtt):
+            with mock.patch("app.transcript.MockWhisperBackend") as backend:
+                result = acquire_transcript_with_provider(
+                    metadata,
+                    provider_name="real-fallback",
+                )
+
+        backend.assert_not_called()
+        self.assertEqual(result.provider, OFFICIAL_SUBTITLE_PROVIDER_ID)
+        self.assertEqual(result.attempted_providers, [OFFICIAL_SUBTITLE_PROVIDER_ID])
+        self.assertEqual(result.segments[0].text, "Official subtitle text")
+
+    def test_real_fallback_uses_mock_whisper_for_missing_subtitles(self) -> None:
         metadata = _youtube_metadata_with_raw({})
 
-        with self.assertRaises(ProviderNotImplementedError) as context:
-            acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+        result = acquire_transcript_with_provider(metadata, provider_name="real-fallback")
 
-        self.assertIn(
-            "Whisper fallback is eligible but not implemented in this stage: "
-            "no official subtitles found.",
-            str(context.exception),
+        self.assertEqual(result.provider, LOCAL_WHISPER_MOCK_PROVIDER_ID)
+        self.assertEqual(
+            result.attempted_providers,
+            [OFFICIAL_SUBTITLE_PROVIDER_ID, LOCAL_WHISPER_MOCK_PROVIDER_ID],
         )
+        self.assertEqual(len(result.segments), 3)
+        self.assertIn("Mock Whisper fallback transcript", result.segments[0].text)
 
-    def test_real_fallback_reports_eligible_unsupported_subtitle_format(self) -> None:
+    def test_real_fallback_uses_mock_whisper_for_unsupported_subtitle_format(self) -> None:
         metadata = _youtube_metadata_with_raw(
             {"subtitles": {"en": [{"ext": "json3", "url": "https://example.com/en.json3"}]}}
         )
 
-        with self.assertRaises(ProviderNotImplementedError) as context:
-            acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+        result = acquire_transcript_with_provider(metadata, provider_name="real-fallback")
 
-        self.assertIn(
-            "Whisper fallback is eligible but not implemented in this stage: "
-            "official subtitles have no VTT/WebVTT track.",
-            str(context.exception),
+        self.assertEqual(result.provider, LOCAL_WHISPER_MOCK_PROVIDER_ID)
+        self.assertEqual(
+            result.attempted_providers,
+            [OFFICIAL_SUBTITLE_PROVIDER_ID, LOCAL_WHISPER_MOCK_PROVIDER_ID],
         )
+        self.assertTrue(result.segments)
+
+    def test_mock_whisper_backend_returns_stable_transcript_result(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+
+        result = MockWhisperBackend().transcribe(metadata)
+
+        self.assertEqual(result.provider, LOCAL_WHISPER_MOCK_PROVIDER_ID)
+        self.assertEqual(result.attempted_providers, [LOCAL_WHISPER_MOCK_PROVIDER_ID])
+        self.assertEqual(len(result.segments), 3)
+        self.assertEqual(result.segments[0].start, "00:00:00")
+        self.assertEqual(result.segments[0].end, "00:00:15")
+        self.assertIn("Mock Whisper fallback transcript", result.segments[0].text)
 
     def test_real_fallback_preserves_platform_access_error(self) -> None:
         metadata = _youtube_metadata_with_raw(
