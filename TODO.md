@@ -19,7 +19,9 @@
 - [x] Plan `v0.4.x Official Transcript`.
 - [x] Add YouTube official VTT/WebVTT subtitle acquisition.
 - [x] Add sanitized error boundary for official VTT text fetch failures.
-- [ ] Re-run live YouTube official subtitle smoke test after HTTP 429 rate limit clears.
+- [x] Run live YouTube official subtitle smoke test after HTTP 429 rate limit clears.
+- [ ] Plan `v0.5.x Whisper Fallback`.
+- [ ] Define fallback policy and error taxonomy for Whisper fallback.
 - [ ] Add transcript API fallback.
 - [ ] Add local Whisper fallback.
 - [ ] Add configurable LLM summarizer.

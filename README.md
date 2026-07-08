@@ -15,13 +15,13 @@ video URL / local video
 
 ## Current Version
 
-v0.3.0
+v0.4.0
 
 ## Current Development Stage
 
-YouTube Real Metadata completed.
+Official Transcript verified.
 
-The current milestone is `v0.4.x Official Transcript`.
+The current milestone is `v0.5.x Whisper Fallback`.
 
 Implemented now:
 
@@ -36,6 +36,7 @@ Implemented now:
 - Provider boundaries with explicit not-implemented errors.
 - Real YouTube metadata provider boundary using `yt-dlp` metadata-only mode.
 - YouTube official subtitle provider for VTT/WebVTT tracks.
+- Verified YouTube official `zh-CN` VTT smoke test on a public TED video.
 
 Not implemented yet:
 
@@ -47,7 +48,6 @@ Not implemented yet:
 - External knowledge base sync such as Notion or Feishu.
 - MCP server.
 - Browser extension.
-- Live YouTube official subtitle smoke test.
 
 ## Run the Mock CLI
 
@@ -87,7 +87,7 @@ YouTube official subtitles are exposed through:
 python -m app.cli import-url "https://www.youtube.com/watch?v=VIDEO_ID" --metadata-provider yt-dlp --transcript-provider official-subtitles
 ```
 
-This provider only uses official VTT/WebVTT subtitle tracks from `yt-dlp` metadata. It does not use automatic captions, Transcript API fallback, Whisper, or LLMs. Live subtitle smoke testing remains a separate confirmation step.
+This provider only uses official VTT/WebVTT subtitle tracks from `yt-dlp` metadata. It does not use automatic captions, Transcript API fallback, Whisper, or LLMs. A live smoke test has verified official `zh-CN` VTT subtitles on a public TED video.
 
 ## Run Tests
 

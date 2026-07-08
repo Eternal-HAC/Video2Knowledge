@@ -2,13 +2,13 @@
 
 ## Snapshot Date
 
-2026-07-06
+2026-07-08
 
 ## Current Version
 
-v0.3.0
+v0.4.0
 
-Real Metadata
+Official Transcript
 
 ## Project
 
@@ -16,7 +16,7 @@ Video2Knowledge is a Local First AI/PKM tool that converts videos into structure
 
 ## Current Stage
 
-Real metadata baseline completed. The current implementation stage is `v0.4.x Official Transcript`.
+Official transcript baseline completed. The next implementation stage is `v0.5.x Whisper Fallback`.
 
 ## Completed
 
@@ -29,14 +29,15 @@ Real metadata baseline completed. The current implementation stage is `v0.4.x Of
 - Platform capabilities model.
 - YouTube metadata-only provider implemented and validated behind `yt-dlp`.
 - YouTube official subtitle provider for VTT/WebVTT tracks.
+- Live official `zh-CN` VTT smoke test passed on a public TED video.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
   - `v0.3.0`: YouTube metadata-only baseline.
+  - `v0.4.0`: YouTube official transcript baseline.
 
 ## Not Yet Implemented
 
-- Successful live YouTube official subtitle VTT parsing smoke test.
 - Transcript API fallback.
 - Whisper/faster-whisper.
 - LLM providers.
@@ -57,17 +58,18 @@ Real metadata baseline completed. The current implementation stage is `v0.4.x Of
 
 ## Next Steps
 
-1. Review the `v0.4.x Official Transcript` implementation.
-2. Re-run a public YouTube official subtitle smoke test after the current YouTube HTTP 429 rate limit clears.
-3. Keep transcript API fallback, Whisper, LLM, and export work out of `v0.4.x`.
+1. Tag `v0.4.0`.
+2. Plan `v0.5.x Whisper Fallback`, starting with fallback policy and error taxonomy.
+3. Keep Transcript API fallback, LLM, and export work out of the first Whisper stage.
 
 ## Live Validation Notes
 
 - Metadata-only screening found a TED video with official subtitles and a `zh-CN` VTT/WebVTT track.
-- The full official subtitle smoke test was blocked when the VTT text request returned HTTP 429.
-- Browser access to YouTube also showed HTTP 429, so the failure is treated as access environment or platform rate limiting.
-- This is not equivalent to the video lacking official subtitles.
-- VTT parsing against live YouTube subtitles still needs confirmation after the network environment recovers.
+- After the HTTP 429 condition cleared, the full official subtitle smoke test passed.
+- Test URL: `https://www.youtube.com/watch?v=iG9CE55wbtY`
+- Provider: `yt_dlp_official_subtitles`
+- Attempted providers: `["yt_dlp_official_subtitles"]`
+- Output was Markdown only; no video, audio, subtitle, thumbnail, or other media artifacts were found.
 
 ## Must Read Files for Continuation
 

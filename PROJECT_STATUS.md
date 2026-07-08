@@ -122,3 +122,23 @@ Validation target:
 
 - CLI must print a concise `Error: official subtitle VTT fetch failed: ...` message without traceback.
 - Real VTT parsing smoke test remains pending until the network environment is no longer rate limited.
+
+## 2026-07-08
+
+Status: `v0.4.x Official Transcript` live smoke test passed.
+
+Validation:
+
+- URL: `https://www.youtube.com/watch?v=iG9CE55wbtY`
+- Selected subtitle: official `zh-CN` `vtt`
+- Provider: `yt_dlp_official_subtitles`
+- Attempted providers: `["yt_dlp_official_subtitles"]`
+- Output: Markdown only
+- Generated Markdown: `output\markdown\do-schools-kill-creativity-sir-ken-robinson-ted.md`
+- No video, audio, subtitle, thumbnail, or other media artifacts were found in the project directory.
+- Unit tests passed: `Ran 30 tests ... OK`
+
+Next target:
+
+- Prepare `v0.4.0` tag.
+- Plan `v0.5.x Whisper Fallback`, starting with fallback policy and error taxonomy.

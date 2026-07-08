@@ -36,7 +36,7 @@ Status: Completed at `v0.3.0`.
 
 ### v0.4.x Official Transcript
 
-- Status: In progress.
+- Status: Completed at `v0.4.0`.
 - Add YouTube official transcript acquisition.
 - Support only official VTT/WebVTT subtitle tracks.
 - Do not use automatic captions.

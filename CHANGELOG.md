@@ -53,3 +53,10 @@
 - Added sanitized error handling for official subtitle VTT text fetch failures.
 - Covered HTTP 429, HTTP 403, network failures, timeouts, and unknown request failures in tests.
 - Recorded that TED metadata screening found official `zh-CN` VTT subtitles, while live VTT fetching was blocked by YouTube HTTP 429 in the current environment.
+
+## 2026-07-08
+
+- Verified YouTube official `zh-CN` VTT smoke test on the TED video `https://www.youtube.com/watch?v=iG9CE55wbtY`.
+- Generated structured Markdown from official subtitles.
+- Confirmed no video, audio, subtitle, thumbnail, or other media artifacts were written to the project directory.
+- Marked `v0.4.x Official Transcript` ready for the `v0.4.0` tag.
