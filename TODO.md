@@ -33,3 +33,4 @@
 - Browser extension.
 - Batch import.
 - Prompt template management.
+- Study cangjie-skill-style method-card or skill-pack export after Whisper fallback and base LLM extraction are stable.

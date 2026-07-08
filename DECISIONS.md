@@ -203,3 +203,20 @@ The provider keeps the same official VTT/WebVTT-only boundary while CLI errors r
 
 Follow-up Review:
 Re-run the official subtitle smoke test only after user confirmation and a recovered network environment.
+
+## 2026-07-08
+
+Decision:
+Keep Video2Knowledge's primary output as structured Markdown knowledge notes. Treat cangjie-skill-style method-card or skill-pack generation as a future optional advanced export.
+
+Reason:
+cangjie-skill is a useful downstream reference for turning long-form content into executable AI Skills, but Video2Knowledge still needs to stabilize acquisition, transcript, Whisper fallback, and base LLM extraction first. Skill-pack generation would mix a downstream product layer into the current provider and transcript stages.
+
+Alternatives:
+Add skill-pack output directly to `v0.4.x`, `v0.5.x`, or the first LLM extraction stage.
+
+Impact:
+The project keeps a clear staged architecture: source acquisition and transcript first, structured Markdown as the durable local artifact, knowledge extraction next, and optional skill-pack or method-card export only after the base pipeline is reliable.
+
+Follow-up Review:
+Revisit during or after `v0.6.x Knowledge Extraction`, after Whisper fallback and basic LLM extraction are stable.

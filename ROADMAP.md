@@ -52,6 +52,8 @@ Status: Completed at `v0.3.0`.
 
 - Add configurable LLM summarization and extraction.
 - Keep provider calls behind clear boundaries.
+- Study optional method-card or skill-pack export inspired by cangjie-skill after base extraction is stable.
+- Keep structured Markdown notes as the primary output contract.
 
 ### v0.7.x Obsidian Export
 
