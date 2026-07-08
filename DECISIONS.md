@@ -254,3 +254,20 @@ Impact:
 
 Follow-up Review:
 Use the stable Mock fallback path when designing the audio acquisition and ffmpeg boundary.
+
+## 2026-07-09
+
+Decision:
+Add Mock audio acquisition and Mock audio normalization boundaries before implementing cache handling, real audio download, or ffmpeg execution.
+
+Reason:
+The fallback chain should prove where audio acquisition and normalization belong without introducing media files, filesystem cleanup, ffmpeg availability checks, or network behavior.
+
+Alternatives:
+Add real `yt-dlp` audio download and ffmpeg normalization directly after the Mock Whisper fallback stage.
+
+Impact:
+`real-fallback` now has a visible audio processing boundary while preserving the existing transcript-level `attempted_providers` contract. The project can test fallback orchestration without creating media artifacts.
+
+Follow-up Review:
+Define cache/temp handling and explicit audio download confirmation before any real media acquisition is implemented.

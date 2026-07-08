@@ -29,3 +29,15 @@ class PlatformAccessError(TranscriptProviderError):
 
 class NetworkAccessError(TranscriptProviderError):
     """Raised when transcript access fails because of network conditions."""
+
+
+class AudioAcquisitionError(RuntimeError):
+    """Raised when audio cannot be acquired for transcription."""
+
+
+class AudioProcessingError(RuntimeError):
+    """Raised when audio cannot be processed for transcription."""
+
+
+class FfmpegNotFoundError(AudioProcessingError):
+    """Raised when ffmpeg is required but unavailable."""

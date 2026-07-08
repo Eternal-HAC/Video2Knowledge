@@ -32,6 +32,7 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 - Live official `zh-CN` VTT smoke test passed on a public TED video.
 - Transcript fallback eligibility policy and error taxonomy for the upcoming Whisper fallback.
 - Mock Whisper fallback pipeline for eligible official subtitle failures.
+- Mock audio acquisition and normalization boundaries for the fallback path.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -41,7 +42,7 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 ## Not Yet Implemented
 
 - Transcript API fallback.
-- Audio acquisition and ffmpeg processing.
+- Real audio acquisition and ffmpeg processing.
 - Real Whisper/faster-whisper execution.
 - LLM providers.
 - Obsidian automation.
@@ -60,13 +61,14 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 - Official subtitle provider uses only official VTT/WebVTT tracks and never automatic captions.
 - Only missing official subtitles and unsupported official subtitle formats are eligible for Whisper fallback.
 - Platform and network access failures must stop and must not trigger Whisper fallback.
-- `real-fallback` currently uses a Mock local Whisper backend only; it does not download audio or run real Whisper.
+- `real-fallback` currently uses only Mock audio processing and Mock local Whisper; it does not download audio or run real Whisper.
+- `real-fallback` eligible cases pass through Mock audio and Mock normalizer boundaries only; they do not read or write media files.
 
 ## Next Steps
 
-1. Review and commit `v0.5.0b Mock Whisper Fallback Pipeline`.
-2. Plan the audio acquisition and ffmpeg boundary.
-3. Keep faster-whisper, Transcript API fallback, LLM, and export work out of the next audio boundary stage.
+1. Review and commit `v0.5.0c1 Mock Audio Processing Boundary`.
+2. Plan cache/temp handling and explicit audio download confirmation for `v0.5.0c2`.
+3. Keep real ffmpeg, faster-whisper, Transcript API fallback, LLM, and export work out of `v0.5.0c2`.
 
 ## Live Validation Notes
 

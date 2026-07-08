@@ -73,3 +73,10 @@
 - Updated `real-fallback` to return official subtitles when available and use Mock Whisper only for fallback-eligible subtitle absence or unsupported subtitle formats.
 - Preserved stop behavior for platform access, network access, and generic transcript provider failures.
 - Kept audio acquisition, ffmpeg processing, and real Whisper execution out of this stage.
+
+## 2026-07-09
+
+- Added Mock audio acquisition and Mock audio normalization boundaries.
+- Routed fallback-eligible `real-fallback` cases through Mock audio processing before Mock Whisper.
+- Kept `attempted_providers` focused on transcript providers without adding audio or normalizer ids.
+- Kept real audio download, ffmpeg execution, cache handling, CLI flags, and real Whisper execution out of this stage.

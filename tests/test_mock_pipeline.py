@@ -11,6 +11,12 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from unittest import mock
 
+from app.audio import (
+    AudioArtifact,
+    MockAudioNormalizer,
+    MockAudioProvider,
+    NormalizedAudio,
+)
 from app.cli import main, run_import_url
 from app.downloader import get_mock_metadata, get_metadata_with_provider
 from app.errors import (
@@ -389,16 +395,54 @@ Official subtitle text
 """
 
         with mock.patch("app.transcript.fetch_text", return_value=vtt):
-            with mock.patch("app.transcript.MockWhisperBackend") as backend:
+            with mock.patch("app.transcript.MockAudioProvider") as audio_provider:
+                with mock.patch("app.transcript.MockAudioNormalizer") as normalizer:
+                    with mock.patch("app.transcript.MockWhisperBackend") as backend:
+                        result = acquire_transcript_with_provider(
+                            metadata,
+                            provider_name="real-fallback",
+                        )
+
+        audio_provider.assert_not_called()
+        normalizer.assert_not_called()
+        backend.assert_not_called()
+        self.assertEqual(result.provider, OFFICIAL_SUBTITLE_PROVIDER_ID)
+        self.assertEqual(result.attempted_providers, [OFFICIAL_SUBTITLE_PROVIDER_ID])
+        self.assertEqual(result.segments[0].text, "Official subtitle text")
+
+    def test_real_fallback_uses_mock_audio_boundary_for_missing_subtitles(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+        audio = AudioArtifact(
+            path=Path("mock-audio.wav"),
+            provider="mock_audio_provider",
+            format="wav",
+            temporary=True,
+        )
+        normalized = NormalizedAudio(
+            path=Path("normalized-mock-audio.wav"),
+            provider="mock_ffmpeg_normalizer",
+            format="wav",
+            sample_rate=16000,
+            channels=1,
+            temporary=True,
+        )
+
+        with mock.patch("app.transcript.MockAudioProvider") as audio_provider:
+            with mock.patch("app.transcript.MockAudioNormalizer") as normalizer:
+                audio_provider.return_value.acquire.return_value = audio
+                normalizer.return_value.normalize.return_value = normalized
                 result = acquire_transcript_with_provider(
                     metadata,
                     provider_name="real-fallback",
                 )
 
-        backend.assert_not_called()
-        self.assertEqual(result.provider, OFFICIAL_SUBTITLE_PROVIDER_ID)
-        self.assertEqual(result.attempted_providers, [OFFICIAL_SUBTITLE_PROVIDER_ID])
-        self.assertEqual(result.segments[0].text, "Official subtitle text")
+        audio_provider.return_value.acquire.assert_called_once_with(metadata)
+        normalizer.return_value.normalize.assert_called_once_with(audio)
+        self.assertEqual(result.provider, LOCAL_WHISPER_MOCK_PROVIDER_ID)
+        self.assertEqual(
+            result.attempted_providers,
+            [OFFICIAL_SUBTITLE_PROVIDER_ID, LOCAL_WHISPER_MOCK_PROVIDER_ID],
+        )
 
     def test_real_fallback_uses_mock_whisper_for_missing_subtitles(self) -> None:
         metadata = _youtube_metadata_with_raw({})
@@ -417,9 +461,20 @@ Official subtitle text
         metadata = _youtube_metadata_with_raw(
             {"subtitles": {"en": [{"ext": "json3", "url": "https://example.com/en.json3"}]}}
         )
+        audio = AudioArtifact(
+            path=Path("mock-audio.wav"),
+            provider="mock_audio_provider",
+            format="wav",
+            temporary=True,
+        )
 
-        result = acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+        with mock.patch("app.transcript.MockAudioProvider") as audio_provider:
+            with mock.patch("app.transcript.MockAudioNormalizer") as normalizer:
+                audio_provider.return_value.acquire.return_value = audio
+                result = acquire_transcript_with_provider(metadata, provider_name="real-fallback")
 
+        audio_provider.return_value.acquire.assert_called_once_with(metadata)
+        normalizer.return_value.normalize.assert_called_once_with(audio)
         self.assertEqual(result.provider, LOCAL_WHISPER_MOCK_PROVIDER_ID)
         self.assertEqual(
             result.attempted_providers,
@@ -439,15 +494,58 @@ Official subtitle text
         self.assertEqual(result.segments[0].end, "00:00:15")
         self.assertIn("Mock Whisper fallback transcript", result.segments[0].text)
 
+    def test_mock_audio_provider_does_not_create_media_file(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+
+        artifact = MockAudioProvider().acquire(metadata)
+
+        self.assertEqual(artifact.provider, "mock_audio_provider")
+        self.assertEqual(artifact.format, "wav")
+        self.assertTrue(artifact.temporary)
+        self.assertFalse(artifact.path.exists())
+
+    def test_mock_audio_normalizer_does_not_create_media_file(self) -> None:
+        artifact = AudioArtifact(
+            path=Path("mock-audio.wav"),
+            provider="mock_audio_provider",
+            format="wav",
+            temporary=True,
+        )
+
+        normalized = MockAudioNormalizer().normalize(artifact)
+
+        self.assertEqual(normalized.provider, "mock_ffmpeg_normalizer")
+        self.assertEqual(normalized.format, "wav")
+        self.assertEqual(normalized.sample_rate, 16000)
+        self.assertEqual(normalized.channels, 1)
+        self.assertTrue(normalized.temporary)
+        self.assertFalse(normalized.path.exists())
+
     def test_real_fallback_preserves_platform_access_error(self) -> None:
         metadata = _youtube_metadata_with_raw(
             {"subtitles": {"zh-CN": [{"ext": "vtt", "url": "https://example.com/zh.vtt"}]}}
         )
-        error = HTTPError("https://example.com/zh.vtt", 429, "Too Many Requests", None, None)
 
-        with mock.patch("app.transcript.urlopen", side_effect=error):
-            with self.assertRaises(PlatformAccessError):
-                acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+        for status_code in [429, 403]:
+            with self.subTest(status_code=status_code):
+                error = HTTPError(
+                    "https://example.com/zh.vtt",
+                    status_code,
+                    "Platform Access Error",
+                    None,
+                    None,
+                )
+                with mock.patch("app.transcript.urlopen", side_effect=error):
+                    with mock.patch("app.transcript.MockAudioProvider") as audio_provider:
+                        with mock.patch("app.transcript.MockAudioNormalizer") as normalizer:
+                            with self.assertRaises(PlatformAccessError):
+                                acquire_transcript_with_provider(
+                                    metadata,
+                                    provider_name="real-fallback",
+                                )
+
+                audio_provider.assert_not_called()
+                normalizer.assert_not_called()
 
     def test_real_fallback_preserves_network_access_error(self) -> None:
         metadata = _youtube_metadata_with_raw(
@@ -455,8 +553,27 @@ Official subtitle text
         )
 
         with mock.patch("app.transcript.urlopen", side_effect=URLError("network secret")):
-            with self.assertRaises(NetworkAccessError):
-                acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+            with mock.patch("app.transcript.MockAudioProvider") as audio_provider:
+                with mock.patch("app.transcript.MockAudioNormalizer") as normalizer:
+                    with self.assertRaises(NetworkAccessError):
+                        acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+
+        audio_provider.assert_not_called()
+        normalizer.assert_not_called()
+
+    def test_real_fallback_preserves_generic_transcript_error_without_audio(self) -> None:
+        metadata = _youtube_metadata_with_raw(
+            {"subtitles": {"zh-CN": [{"ext": "vtt", "url": "https://example.com/zh.vtt"}]}}
+        )
+
+        with mock.patch("app.transcript.fetch_text", return_value="WEBVTT\n\n"):
+            with mock.patch("app.transcript.MockAudioProvider") as audio_provider:
+                with mock.patch("app.transcript.MockAudioNormalizer") as normalizer:
+                    with self.assertRaises(TranscriptProviderError):
+                        acquire_transcript_with_provider(metadata, provider_name="real-fallback")
+
+        audio_provider.assert_not_called()
+        normalizer.assert_not_called()
 
     def test_render_markdown_contains_required_frontmatter_and_sections(self) -> None:
         metadata = get_mock_metadata("https://example.com/watch?v=mock")

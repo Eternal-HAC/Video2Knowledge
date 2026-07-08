@@ -183,3 +183,20 @@ Validation target:
 
 - Unit tests cover official success, eligible fallback, non-eligible failures, stable attempted providers, and Mock Whisper output.
 - Mock CLI regression still passes.
+
+## 2026-07-09
+
+Status: `v0.5.0c1 Mock Audio Processing Boundary` implementation in progress.
+
+Changes:
+
+- Add Mock audio acquisition boundary.
+- Add Mock audio normalization boundary.
+- Route eligible `real-fallback` cases through Mock audio and Mock normalizer before Mock Whisper.
+- Keep official subtitle success, platform access failures, network failures, and generic transcript failures from triggering audio processing.
+- Keep real audio download, ffmpeg execution, cache handling, CLI flags, and real Whisper execution out of this stage.
+
+Validation target:
+
+- Unit tests cover mock audio and normalizer calls without network or media files.
+- Mock CLI regression still passes.

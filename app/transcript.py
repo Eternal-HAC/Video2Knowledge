@@ -13,6 +13,7 @@ from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
+from app.audio import MockAudioNormalizer, MockAudioProvider
 from app.errors import (
     NetworkAccessError,
     NoOfficialSubtitleError,
@@ -58,6 +59,8 @@ class RealFallbackTranscriptProvider:
             return YtDlpOfficialSubtitleProvider().acquire(metadata)
         except TranscriptProviderError as error:
             if should_fallback_to_whisper(error):
+                audio = MockAudioProvider().acquire(metadata)
+                _normalized_audio = MockAudioNormalizer().normalize(audio)
                 result = MockWhisperBackend().transcribe(metadata)
                 return TranscriptResult(
                     segments=result.segments,
