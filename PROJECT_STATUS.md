@@ -232,3 +232,23 @@ Validation target:
 
 - Unit tests mock `shutil.which` and `subprocess.run`; no real ffmpeg execution is required.
 - Mock CLI regression still passes.
+
+## 2026-07-09
+
+Status: `v0.5.0d2 Local ffmpeg Smoke Test` passed.
+
+Validation:
+
+- ffmpeg path: `D:\yt-dlp\ffmpeg.exe`
+- ffprobe path: `D:\yt-dlp\ffprobe.exe`
+- Input: local short audio file `F:\05_Music\test\20260709_205744.m4a`
+- Output: ignored runtime artifact `output\cache\audio\20260709_205744-16k-mono.wav`
+- Normalized audio: `wav`, mono, `16000 Hz`, `pcm_s16le`
+- `NormalizedAudio`: `provider=ffmpeg_audio_normalizer`, `format=wav`, `sample_rate=16000`, `channels=1`, `temporary=True`
+- `ffprobe` confirmed `codec_name=pcm_s16le`, `sample_rate=16000`, and `channels=1`.
+- No YouTube access, media download, Whisper, Transcript API, or LLM execution occurred.
+- No tracked file changes were produced by the smoke test; the generated WAV remains under ignored `output/cache/audio/`.
+
+Next target:
+
+- Continue planning the next explicit audio or Whisper integration stage without changing the default `real-fallback` Mock behavior.

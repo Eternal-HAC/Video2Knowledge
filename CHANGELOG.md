@@ -94,3 +94,9 @@
 - Standardized the target normalized audio contract as 16 kHz mono PCM WAV.
 - Added mocked subprocess tests for ffmpeg missing, non-zero exit, timeout, missing input, existing output, missing output, command construction, and sanitized errors.
 - Kept `real-fallback` on the Mock audio normalizer path.
+
+## 2026-07-09
+
+- Verified local ffmpeg normalization smoke test using `FfmpegAudioNormalizer`.
+- Confirmed 16 kHz mono PCM WAV output with `ffprobe`.
+- No media artifacts were committed.
