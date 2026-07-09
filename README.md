@@ -41,13 +41,14 @@ Implemented now:
 - Mock Whisper fallback pipeline for eligible official subtitle failures.
 - Mock audio acquisition and audio normalization boundaries.
 - Cache and runtime media artifact safety policy.
+- ffmpeg audio normalizer boundary for local audio files.
 
 Not implemented yet:
 
 - Real video download.
 - Automatic captions.
 - Transcript API fallback.
-- Audio acquisition and ffmpeg processing.
+- Real audio acquisition and default fallback ffmpeg processing.
 - Real Whisper or faster-whisper transcription execution.
 - LLM calls.
 - External knowledge base sync such as Notion or Feishu.
@@ -97,6 +98,8 @@ This provider only uses official VTT/WebVTT subtitle tracks from `yt-dlp` metada
 `real-fallback` first tries official VTT/WebVTT subtitles. Missing official subtitles and unsupported official subtitle formats enter a deterministic Mock audio provider, Mock audio normalizer, and Mock local Whisper backend. Platform and network access failures such as HTTP 429, HTTP 403, timeout, and network request failure are not eligible and must stop. Real audio acquisition, ffmpeg processing, and real Whisper execution remain future work.
 
 Future real audio acquisition is disabled by default and requires explicit user confirmation per stage. Keeping audio cache also requires explicit confirmation. Runtime media artifacts must stay under `output/` or `cache/` paths and must not be committed.
+
+The ffmpeg normalizer boundary can standardize an existing local audio file to a 16 kHz mono WAV contract, but it is not wired into `real-fallback` by default and no live ffmpeg smoke test has been run in this stage.
 
 ## Run Tests
 

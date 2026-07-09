@@ -216,3 +216,19 @@ Validation target:
 
 - Only documentation and `.gitignore` are changed.
 - Unit tests and Mock CLI regression still pass.
+
+## 2026-07-09
+
+Status: `v0.5.0d ffmpeg Normalizer Boundary` implementation in progress.
+
+Changes:
+
+- Add a real ffmpeg audio normalizer boundary for existing local audio files.
+- Normalize toward 16 kHz mono PCM WAV and return `NormalizedAudio`.
+- Keep `real-fallback` on the existing Mock audio normalizer path.
+- Keep YouTube access, real audio download, Whisper, Transcript API fallback, LLM, CLI flags, and pipeline changes out of this stage.
+
+Validation target:
+
+- Unit tests mock `shutil.which` and `subprocess.run`; no real ffmpeg execution is required.
+- Mock CLI regression still passes.

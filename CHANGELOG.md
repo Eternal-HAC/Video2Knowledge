@@ -87,3 +87,10 @@
 - Documented explicit confirmation requirements for audio acquisition, media download, and keeping audio cache.
 - Documented signed URL, cookie, token, auth header, and sensitive query parameter redaction rules.
 - Kept runtime behavior unchanged.
+
+## 2026-07-09
+
+- Added an ffmpeg audio normalizer boundary for existing local audio files.
+- Standardized the target normalized audio contract as 16 kHz mono PCM WAV.
+- Added mocked subprocess tests for ffmpeg missing, non-zero exit, timeout, missing input, existing output, missing output, command construction, and sanitized errors.
+- Kept `real-fallback` on the Mock audio normalizer path.

@@ -34,6 +34,7 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 - Mock Whisper fallback pipeline for eligible official subtitle failures.
 - Mock audio acquisition and normalization boundaries for the fallback path.
 - Cache/temp safety policy for future audio acquisition.
+- ffmpeg audio normalizer boundary for existing local audio files.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -43,7 +44,8 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 ## Not Yet Implemented
 
 - Transcript API fallback.
-- Real audio acquisition and ffmpeg processing.
+- Real audio acquisition.
+- ffmpeg integration into the default fallback path.
 - Real Whisper/faster-whisper execution.
 - LLM providers.
 - Obsidian automation.
@@ -66,12 +68,13 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 - `real-fallback` eligible cases pass through Mock audio and Mock normalizer boundaries only; they do not read or write media files.
 - Audio acquisition, media download, and keeping audio cache require explicit user confirmation per stage.
 - Signed URLs, cookies, tokens, auth headers, and sensitive query parameters must not be written to logs, Markdown, raw metadata, transcript results, or error messages.
+- The ffmpeg normalizer boundary is available for existing local audio files but is not used by `real-fallback` by default.
 
 ## Next Steps
 
-1. Review and commit `v0.5.0c2 Cache/Temp Safety Policy`.
-2. Plan the real audio acquisition boundary with explicit download confirmation.
-3. Keep real ffmpeg, faster-whisper, Transcript API fallback, LLM, and export work out of the next audio boundary stage.
+1. Review and commit `v0.5.0d ffmpeg Normalizer Boundary`.
+2. Plan a user-confirmed local ffmpeg smoke test or the real audio acquisition boundary.
+3. Keep faster-whisper, Transcript API fallback, LLM, and export work out of the next audio boundary stage.
 
 ## Live Validation Notes
 

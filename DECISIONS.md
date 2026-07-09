@@ -288,3 +288,20 @@ Future runtime media outputs are protected from accidental commits while source 
 
 Follow-up Review:
 Use this policy when adding the real audio acquisition boundary and future `--allow-audio-download` / `--keep-audio-cache` behavior.
+
+## 2026-07-09
+
+Decision:
+Add a real ffmpeg audio normalizer boundary before wiring ffmpeg into the default transcript fallback path.
+
+Reason:
+ffmpeg command construction, output overwrite safety, timeout handling, and sanitized error mapping should be validated separately from audio download and Whisper transcription.
+
+Alternatives:
+Wire ffmpeg directly into `real-fallback`, or wait to implement ffmpeg until the faster-whisper stage.
+
+Impact:
+The project can normalize existing local audio files through a tested boundary while `real-fallback` remains deterministic and Mock-only by default.
+
+Follow-up Review:
+Run a separate user-confirmed local ffmpeg smoke test before using the boundary with real audio.

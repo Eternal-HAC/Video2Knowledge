@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import socket
+import subprocess
 import sys
 import tempfile
 import types
@@ -13,6 +14,7 @@ from unittest import mock
 
 from app.audio import (
     AudioArtifact,
+    FfmpegAudioNormalizer,
     MockAudioNormalizer,
     MockAudioProvider,
     NormalizedAudio,
@@ -20,6 +22,8 @@ from app.audio import (
 from app.cli import main, run_import_url
 from app.downloader import get_mock_metadata, get_metadata_with_provider
 from app.errors import (
+    AudioProcessingError,
+    FfmpegNotFoundError,
     MetadataProviderError,
     NetworkAccessError,
     NoOfficialSubtitleError,
@@ -521,6 +525,173 @@ Official subtitle text
         self.assertTrue(normalized.temporary)
         self.assertFalse(normalized.path.exists())
 
+    def test_ffmpeg_audio_normalizer_reports_missing_ffmpeg(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.m4a"
+            input_path.write_bytes(b"fake audio")
+            artifact = _audio_artifact(input_path)
+
+            with mock.patch("app.audio.shutil.which", return_value=None):
+                with self.assertRaises(FfmpegNotFoundError) as context:
+                    FfmpegAudioNormalizer(output_dir=temp_dir).normalize(artifact)
+
+        self.assertEqual(str(context.exception), "ffmpeg not found")
+
+    def test_ffmpeg_audio_normalizer_reports_missing_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "missing.m4a"
+            artifact = _audio_artifact(input_path)
+
+            with self.assertRaises(AudioProcessingError) as context:
+                FfmpegAudioNormalizer(
+                    output_dir=temp_dir,
+                    ffmpeg_path="ffmpeg",
+                ).normalize(artifact)
+
+        self.assertEqual(str(context.exception), "audio input file not found")
+
+    def test_ffmpeg_audio_normalizer_does_not_overwrite_existing_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.m4a"
+            output_path = Path(temp_dir) / "input-16k-mono.wav"
+            input_path.write_bytes(b"fake audio")
+            output_path.write_bytes(b"existing output")
+            artifact = _audio_artifact(input_path)
+
+            with mock.patch("app.audio.subprocess.run") as run:
+                with self.assertRaises(AudioProcessingError) as context:
+                    FfmpegAudioNormalizer(
+                        output_dir=temp_dir,
+                        ffmpeg_path="ffmpeg",
+                    ).normalize(artifact)
+
+        self.assertEqual(
+            str(context.exception),
+            "ffmpeg normalized output already exists",
+        )
+        run.assert_not_called()
+
+    def test_ffmpeg_audio_normalizer_runs_expected_command(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.m4a"
+            output_path = Path(temp_dir) / "input-16k-mono.wav"
+            input_path.write_bytes(b"fake audio")
+            artifact = _audio_artifact(input_path)
+
+            def complete_process(command, **kwargs):
+                output_path.write_bytes(b"fake wav")
+                return subprocess.CompletedProcess(command, 0, "", "")
+
+            with mock.patch("app.audio.subprocess.run", side_effect=complete_process) as run:
+                normalized = FfmpegAudioNormalizer(
+                    output_dir=temp_dir,
+                    ffmpeg_path="ffmpeg",
+                    timeout_seconds=12,
+                ).normalize(artifact)
+
+        command = run.call_args.args[0]
+        self.assertEqual(command[0], "ffmpeg")
+        self.assertEqual(command[1:4], ["-y", "-i", str(input_path)])
+        self.assertIn("-vn", command)
+        self.assertIn("-ac", command)
+        self.assertIn("1", command)
+        self.assertIn("-ar", command)
+        self.assertIn("16000", command)
+        self.assertIn("-acodec", command)
+        self.assertIn("pcm_s16le", command)
+        self.assertIn("-f", command)
+        self.assertEqual(command[-2:], ["wav", str(output_path)])
+        self.assertEqual(run.call_args.kwargs["timeout"], 12)
+        self.assertTrue(run.call_args.kwargs["capture_output"])
+        self.assertTrue(run.call_args.kwargs["text"])
+        self.assertEqual(normalized.path, output_path)
+        self.assertEqual(normalized.provider, "ffmpeg_audio_normalizer")
+        self.assertEqual(normalized.format, "wav")
+        self.assertEqual(normalized.sample_rate, 16000)
+        self.assertEqual(normalized.channels, 1)
+
+    def test_ffmpeg_audio_normalizer_wraps_non_zero_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.m4a"
+            input_path.write_bytes(b"fake audio")
+            artifact = _audio_artifact(input_path)
+            process = subprocess.CompletedProcess(
+                ["ffmpeg"],
+                1,
+                "",
+                "signature=secret token=hidden stderr",
+            )
+
+            with mock.patch("app.audio.subprocess.run", return_value=process):
+                with self.assertRaises(AudioProcessingError) as context:
+                    FfmpegAudioNormalizer(
+                        output_dir=temp_dir,
+                        ffmpeg_path="ffmpeg",
+                    ).normalize(artifact)
+
+        message = str(context.exception)
+        self.assertEqual(message, "ffmpeg audio normalization failed")
+        _assert_sensitive_audio_error_not_leaked(self, message)
+
+    def test_ffmpeg_audio_normalizer_wraps_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.m4a"
+            input_path.write_bytes(b"fake audio")
+            artifact = _audio_artifact(input_path)
+
+            with mock.patch(
+                "app.audio.subprocess.run",
+                side_effect=subprocess.TimeoutExpired(["ffmpeg", "secret"], 12),
+            ):
+                with self.assertRaises(AudioProcessingError) as context:
+                    FfmpegAudioNormalizer(
+                        output_dir=temp_dir,
+                        ffmpeg_path="ffmpeg",
+                        timeout_seconds=12,
+                    ).normalize(artifact)
+
+        message = str(context.exception)
+        self.assertEqual(message, "ffmpeg audio normalization timed out")
+        _assert_sensitive_audio_error_not_leaked(self, message)
+
+    def test_ffmpeg_audio_normalizer_reports_missing_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.m4a"
+            input_path.write_bytes(b"fake audio")
+            artifact = _audio_artifact(input_path)
+            process = subprocess.CompletedProcess(["ffmpeg"], 0, "", "")
+
+            with mock.patch("app.audio.subprocess.run", return_value=process):
+                with self.assertRaises(AudioProcessingError) as context:
+                    FfmpegAudioNormalizer(
+                        output_dir=temp_dir,
+                        ffmpeg_path="ffmpeg",
+                    ).normalize(artifact)
+
+        self.assertEqual(
+            str(context.exception),
+            "ffmpeg normalized output missing",
+        )
+
+    def test_ffmpeg_audio_normalizer_errors_do_not_leak_sensitive_input(self) -> None:
+        sensitive_name = "input-signature-secret-token-hidden.m4a"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / sensitive_name
+            input_path.write_bytes(b"fake audio")
+            artifact = _audio_artifact(input_path)
+            process = subprocess.CompletedProcess(["ffmpeg"], 1, "", "secret stderr")
+
+            with mock.patch("app.audio.subprocess.run", return_value=process):
+                with self.assertRaises(AudioProcessingError) as context:
+                    FfmpegAudioNormalizer(
+                        output_dir=temp_dir,
+                        ffmpeg_path="ffmpeg",
+                    ).normalize(artifact)
+
+        message = str(context.exception)
+        self.assertEqual(message, "ffmpeg audio normalization failed")
+        _assert_sensitive_audio_error_not_leaked(self, message)
+
     def test_real_fallback_preserves_platform_access_error(self) -> None:
         metadata = _youtube_metadata_with_raw(
             {"subtitles": {"zh-CN": [{"ext": "vtt", "url": "https://example.com/zh.vtt"}]}}
@@ -818,6 +989,15 @@ def _youtube_metadata_with_raw(raw_metadata: dict[str, object]):
     )
 
 
+def _audio_artifact(path: Path) -> AudioArtifact:
+    return AudioArtifact(
+        path=path,
+        provider="test_audio_provider",
+        format=path.suffix.lstrip(".") or "unknown",
+        temporary=True,
+    )
+
+
 def _assert_sensitive_subtitle_url_not_leaked(
     test_case: unittest.TestCase,
     output: str,
@@ -828,6 +1008,22 @@ def _assert_sensitive_subtitle_url_not_leaked(
         "token",
         "secret",
         "hidden",
+    ]:
+        test_case.assertNotIn(sensitive_value, output)
+
+
+def _assert_sensitive_audio_error_not_leaked(
+    test_case: unittest.TestCase,
+    output: str,
+) -> None:
+    for sensitive_value in [
+        "signature",
+        "token",
+        "secret",
+        "hidden",
+        "stderr",
+        "ffmpeg -y",
+        "input-signature-secret-token-hidden",
     ]:
         test_case.assertNotIn(sensitive_value, output)
 

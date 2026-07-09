@@ -150,3 +150,16 @@ The Mock audio provider and normalizer do not read local media, write audio file
 Real audio acquisition remains disabled. Future audio download and audio cache retention require explicit user confirmation per stage. Runtime media artifacts belong only under `output/` or `cache/` paths and are ignored by Git.
 
 Signed media URLs, cookies, tokens, auth headers, and sensitive query parameters must not be written to logs, Markdown, `raw_metadata`, `TranscriptResult`, or error messages. Future audio and ffmpeg errors should report stable categories such as `audio download failed`, `audio processing failed`, or `ffmpeg not found` without exposing credentials or signed URLs.
+
+## v0.5.0d ffmpeg Normalizer Boundary
+
+The real ffmpeg normalizer boundary supports only existing local audio files:
+
+```text
+local audio file
+-> ffmpeg
+-> 16 kHz mono PCM WAV
+-> NormalizedAudio
+```
+
+This boundary is not wired into `real-fallback` by default. The fallback path still uses `MockAudioNormalizer`. The ffmpeg boundary does not download audio, run Whisper, access YouTube, use Transcript API fallback, or call LLMs. Live local ffmpeg validation is deferred to a separate user-confirmed smoke test.
