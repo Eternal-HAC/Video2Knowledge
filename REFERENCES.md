@@ -26,6 +26,36 @@ Useful reference for Obsidian integration, prompts, and multi-model support.
 
 Useful reference for download queue design, configuration, and state management.
 
+## Audio and ASR Pipeline
+
+### kangarooking-skills/video-downloader
+
+Repository:
+
+https://github.com/kangarooking/kangarooking-skills/tree/main/video-downloader
+
+Useful reference for:
+
+- ffmpeg availability check.
+- audio extraction / normalization command structure.
+- local Whisper CLI or cloud ASR backend selection.
+- transcript.txt / raw ASR JSON output artifact design.
+- clear ASR backend behavior such as auto / none / whisper / cloud provider.
+
+Do not copy directly:
+
+- Do not turn Video2Knowledge into a video downloader.
+- Do not copy its platform download behavior.
+- Do not use cookies, login sessions, or authenticated access without explicit user confirmation.
+- Do not add automatic media download to v0.5.x without a separate stage and user confirmation.
+- Keep Video2Knowledge's main output as structured Markdown, not source-material folders.
+
+Relationship to Video2Knowledge:
+
+- It is an upstream material acquisition / ASR reference.
+- Video2Knowledge should borrow only the audio-processing boundary and ASR backend design ideas.
+- Video2Knowledge should preserve its current staged architecture: official subtitles first, then explicit audio acquisition, then local Whisper fallback, then structured Markdown.
+
 ## Future Technical References
 
 - yt-dlp.
