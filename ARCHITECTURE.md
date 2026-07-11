@@ -219,7 +219,7 @@ download behavior must default to disabled, use temporary artifacts by default,
 require separate confirmation to retain cache, and never expose signed URLs,
 cookies, tokens, auth headers, query parameters, or raw yt-dlp errors.
 
-## v0.5.1 Real Audio Acquisition Boundary Design
+## v0.5.2a YouTube Audio Acquisition Provider Boundary
 
 The future `yt_dlp_audio` provider will continue to implement the existing
 `AudioProvider.acquire(metadata) -> AudioArtifact` contract. Provider-specific
@@ -230,22 +230,27 @@ changing the shared protocol:
 YtDlpAudioProvider(
     workspace_dir=None,
     allow_audio_download=False,
-    keep_cache=False,
     timeout_seconds=600,
 )
 ```
 
-This is a design contract only. `YtDlpAudioProvider` is not implemented yet.
+`YtDlpAudioProvider` now implements this limited boundary through the yt-dlp
+Python API. It supports only `metadata.platform == "youtube"`; it does not
+claim general yt-dlp platform support. Download permission defaults to false
+and is checked before importing yt-dlp or invoking its backend.
 
-Permission checks must happen before network access, workspace creation, or
-download backend invocation. `allow_audio_download` defaults to false, and
-`keep_cache=True` must never bypass the download permission gate.
+The provider requests one `bestaudio` stream with playlists, subtitles,
+automatic subtitles, thumbnails, yt-dlp configuration files, and postprocessors
+disabled. It returns a temporary `AudioArtifact` only after confirming that the
+reported file exists inside the supplied workspace. It does not run ffmpeg,
+Whisper, or cleanup logic. Its optional workspace argument is only a destination
+directory; ownership and lifecycle management remain deferred.
 
-Default acquisition uses an `AudioWorkspace` backed by a system temporary
-directory and returns `AudioArtifact(temporary=True)`. Explicitly retained
-cache belongs under `output/cache/audio/<source_id>/` and returns
-`temporary=False`. Cache retention requires separate user confirmation, must
-not overwrite an existing artifact, and must not use a video title as an
+When no workspace is supplied, the provider uses the system temporary directory
+and still returns `AudioArtifact(temporary=True)`. No cache-retention behavior
+exists in this stage. A future retained cache belongs under
+`output/cache/audio/<source_id>/`, requires separate explicit confirmation,
+must not overwrite an existing artifact, and must not use a video title as an
 unsanitized filename.
 
 The future `AudioWorkspace` owns only artifacts created inside its workspace.
@@ -255,7 +260,7 @@ by `LocalFileAudioProvider`. Cleanup failure may produce a sanitized warning
 but must not hide the original acquisition, normalization, or transcription
 error.
 
-Future `real-fallback` integration remains outside this design stage:
+Future `real-fallback` integration remains outside this stage:
 
 ```text
 eligible official subtitle failure
@@ -284,10 +289,12 @@ Completed:
 - Real ffmpeg normalizer boundary for existing local audio.
 - Local ffmpeg and ffprobe smoke test.
 - Local file audio provider boundary for user-owned files.
+- YouTube-only `yt_dlp_audio` provider boundary with mocked backend tests.
 
 Not implemented:
 
-- Network-backed audio acquisition.
+- A user-confirmed live audio acquisition test.
+- Workspace cleanup ownership or retained audio cache.
 - Selection of real ffmpeg normalization in `real-fallback`.
 - Real Whisper or faster-whisper execution.
 - Transcript API fallback.

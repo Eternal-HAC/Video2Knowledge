@@ -36,6 +36,7 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - Cache/temp safety policy for future audio acquisition.
 - ffmpeg audio normalizer boundary for existing local audio files.
 - User-confirmed local ffmpeg smoke test with `ffprobe` validation of 16 kHz mono `pcm_s16le` WAV output.
+- YouTube-only `YtDlpAudioProvider` boundary with explicit permission, audio-only yt-dlp Python API options, and mocked backend tests.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -45,7 +46,8 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 ## Not Yet Implemented
 
 - Transcript API fallback.
-- Real audio acquisition.
+- User-confirmed live audio acquisition.
+- AudioWorkspace cleanup and retained-cache behavior.
 - ffmpeg integration into the default fallback path.
 - Real Whisper/faster-whisper execution.
 - LLM providers.
@@ -70,10 +72,11 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - Audio acquisition, media download, and keeping audio cache require explicit user confirmation per stage.
 - Signed URLs, cookies, tokens, auth headers, and sensitive query parameters must not be written to logs, Markdown, raw metadata, transcript results, or error messages.
 - The ffmpeg normalizer boundary is available for existing local audio files but is not used by `real-fallback` by default.
+- `YtDlpAudioProvider` is YouTube-only, defaults to disabled, produces temporary audio artifacts, and is not connected to `real-fallback`.
 
 ## Next Steps
 
-1. Plan the real audio acquisition boundary with explicit user permission and sanitized runtime behavior.
+1. Add AudioWorkspace cleanup ownership and separately approved cache retention.
 2. Keep the existing default `real-fallback` Mock-only until a separate integration stage is approved.
 3. Add real Whisper or faster-whisper only after acquisition and cleanup behavior are stable.
 4. Keep Transcript API fallback, LLM extraction, and export expansion in separate stages.

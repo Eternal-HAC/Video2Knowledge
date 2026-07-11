@@ -100,3 +100,10 @@
 - Verified local ffmpeg normalization smoke test using `FfmpegAudioNormalizer`.
 - Confirmed 16 kHz mono PCM WAV output with `ffprobe`.
 - No media artifacts were committed.
+
+## 2026-07-11
+
+- Added a YouTube-only `YtDlpAudioProvider` boundary using the yt-dlp Python API.
+- Required explicit download permission and disabled playlists, subtitle and thumbnail writes, configuration files, and ffmpeg postprocessing.
+- Added mocked yt-dlp tests for permission, platform, workspace, success, timeout, output containment, and sanitized failures.
+- Kept `real-fallback`, pipeline, CLI, cache retention, and workspace cleanup unchanged.

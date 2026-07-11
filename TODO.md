@@ -26,8 +26,10 @@
 - [x] Add mock audio acquisition and normalizer boundary.
 - [x] Add cache/temp handling and explicit audio download confirmation policy.
 - [x] Add ffmpeg audio normalizer boundary.
-- [ ] Add local ffmpeg smoke test after explicit confirmation.
-- [ ] Add real audio acquisition boundary.
+- [x] Add local ffmpeg smoke test after explicit confirmation.
+- [x] Add YouTube-only yt-dlp audio acquisition provider boundary with mocked tests.
+- [ ] Add AudioWorkspace cleanup and separately approved audio cache retention.
+- [ ] Run a separately confirmed live audio acquisition smoke test.
 - [ ] Add faster-whisper backend.
 - [ ] Add transcript API fallback.
 - [ ] Add local Whisper fallback.

@@ -441,3 +441,20 @@ Only an eligible missing-subtitle or unsupported-format result plus explicit dow
 
 Follow-up Review:
 Preserve these boundaries when real acquisition is integrated with ffmpeg and local Whisper in separate stages.
+
+## 2026-07-11
+
+Decision:
+Implement a limited YouTube-only `YtDlpAudioProvider` before workspace lifecycle, cache retention, or fallback integration.
+
+Reason:
+The provider boundary needs real Python API option construction and sanitized error mapping, but a provider cannot safely determine when downstream normalization or transcription has finished using its returned artifact. Combining download behavior with cleanup ownership would make the first implementation stage too broad.
+
+Alternatives:
+Implement `AudioWorkspace` and retained cache in the same commit, expose yt-dlp as a generic all-platform provider, or connect acquisition directly to `real-fallback`.
+
+Impact:
+`YtDlpAudioProvider` supports only YouTube metadata and requires `allow_audio_download=True` before loading yt-dlp or invoking its backend. It requests one audio-only artifact through the yt-dlp Python API, disables playlists, subtitle and thumbnail writes, configuration files, and postprocessors, and returns `AudioArtifact(provider="yt_dlp_audio", temporary=True)`. The optional workspace is a caller-provided destination, not a lifecycle owner. Tests mock yt-dlp; no live network download is part of this stage.
+
+Follow-up Review:
+Add `AudioWorkspace` cleanup ownership and separately approved cache retention before integrating acquisition with ffmpeg, Whisper, or `real-fallback`.

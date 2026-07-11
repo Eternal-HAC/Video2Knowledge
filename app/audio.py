@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import shutil
+import socket
 import subprocess
 import tempfile
 from typing import Protocol
@@ -19,6 +20,7 @@ from app.models import VideoMetadata
 
 MOCK_AUDIO_PROVIDER_ID = "mock_audio_provider"
 LOCAL_FILE_AUDIO_PROVIDER_ID = "local_file_audio"
+YT_DLP_AUDIO_PROVIDER_ID = "yt_dlp_audio"
 MOCK_AUDIO_NORMALIZER_ID = "mock_ffmpeg_normalizer"
 FFMPEG_AUDIO_NORMALIZER_ID = "ffmpeg_audio_normalizer"
 
@@ -98,6 +100,77 @@ class LocalFileAudioProvider:
             provider=self.provider_id,
             format=input_path.suffix.lower().lstrip(".") or "unknown",
             temporary=False,
+        )
+
+
+class YtDlpAudioProvider:
+    """Acquire one YouTube audio artifact through the yt-dlp Python API.
+
+    The caller owns the supplied workspace directory and any later cleanup.
+    This provider deliberately does not run ffmpeg post-processing.
+    """
+
+    provider_id = YT_DLP_AUDIO_PROVIDER_ID
+
+    def __init__(
+        self,
+        workspace_dir: Path | str | None = None,
+        allow_audio_download: bool = False,
+        timeout_seconds: int = 600,
+    ) -> None:
+        self.workspace_dir = Path(workspace_dir) if workspace_dir is not None else None
+        self.allow_audio_download = allow_audio_download
+        self.timeout_seconds = timeout_seconds
+
+    def acquire(self, metadata: VideoMetadata) -> AudioArtifact:
+        if metadata.platform.lower() != "youtube":
+            raise AudioAcquisitionError(
+                "yt-dlp audio provider currently supports YouTube only"
+            )
+        if not metadata.source_url.strip():
+            raise AudioAcquisitionError("audio source URL required")
+        if not self.allow_audio_download:
+            raise AudioAcquisitionError("audio download permission required")
+
+        workspace = self.workspace_dir or Path(tempfile.gettempdir())
+        if not workspace.is_dir():
+            raise AudioAcquisitionError("audio workspace directory required")
+
+        try:
+            import yt_dlp
+        except ImportError as error:
+            raise AudioAcquisitionError("yt-dlp is not installed") from error
+
+        ydl_opts = {
+            "format": "bestaudio",
+            "outtmpl": str(workspace / "video2knowledge-%(id)s.%(ext)s"),
+            "skip_download": False,
+            "noplaylist": True,
+            "writesubtitles": False,
+            "writeautomaticsub": False,
+            "writethumbnail": False,
+            "postprocessors": [],
+            "ignoreconfig": True,
+            "quiet": True,
+            "no_warnings": True,
+            "socket_timeout": self.timeout_seconds,
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(metadata.source_url, download=True)
+                output_path = _downloaded_audio_path(info, ydl, workspace)
+        except (TimeoutError, socket.timeout) as error:
+            raise AudioAcquisitionError("yt-dlp audio acquisition timed out") from error
+        except AudioAcquisitionError:
+            raise
+        except Exception as error:
+            raise AudioAcquisitionError("yt-dlp audio acquisition failed") from error
+
+        return AudioArtifact(
+            path=output_path,
+            provider=self.provider_id,
+            format=output_path.suffix.lower().lstrip(".") or "unknown",
+            temporary=True,
         )
 
 
@@ -192,3 +265,45 @@ class FfmpegAudioNormalizer:
         if not ffmpeg:
             raise FfmpegNotFoundError("ffmpeg not found")
         return ffmpeg
+
+
+def _downloaded_audio_path(
+    info: object,
+    ydl: object,
+    workspace: Path,
+) -> Path:
+    """Resolve one yt-dlp output without exposing its runtime details."""
+
+    candidate = _requested_download_path(info)
+    if candidate is None:
+        try:
+            candidate = Path(ydl.prepare_filename(info))
+        except Exception as error:
+            raise AudioAcquisitionError("yt-dlp audio artifact missing") from error
+
+    try:
+        resolved_workspace = workspace.resolve()
+        resolved_candidate = candidate.resolve()
+    except OSError as error:
+        raise AudioAcquisitionError("yt-dlp audio artifact missing") from error
+
+    if not resolved_candidate.is_relative_to(resolved_workspace):
+        raise AudioAcquisitionError("yt-dlp audio artifact missing")
+    if not resolved_candidate.is_file():
+        raise AudioAcquisitionError("yt-dlp audio artifact missing")
+    return resolved_candidate
+
+
+def _requested_download_path(info: object) -> Path | None:
+    if not isinstance(info, dict):
+        return None
+    downloads = info.get("requested_downloads")
+    if not isinstance(downloads, list) or len(downloads) != 1:
+        return None
+    download = downloads[0]
+    if not isinstance(download, dict):
+        return None
+    path = download.get("filepath")
+    if not isinstance(path, str) or not path:
+        return None
+    return Path(path)

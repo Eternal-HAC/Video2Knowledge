@@ -20,6 +20,8 @@ from app.audio import (
     MockAudioNormalizer,
     MockAudioProvider,
     NormalizedAudio,
+    YT_DLP_AUDIO_PROVIDER_ID,
+    YtDlpAudioProvider,
 )
 from app.cli import main, run_import_url
 from app.downloader import get_mock_metadata, get_metadata_with_provider
@@ -575,6 +577,128 @@ Official subtitle text
 
         self.assertEqual(str(context.exception), "local audio input must be a file")
 
+    def test_ytdlp_audio_provider_requires_explicit_permission(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+
+        with mock.patch.dict(sys.modules, {"yt_dlp": None}):
+            with self.assertRaises(AudioAcquisitionError) as context:
+                YtDlpAudioProvider().acquire(metadata)
+
+        self.assertEqual(str(context.exception), "audio download permission required")
+
+    def test_ytdlp_audio_provider_rejects_non_youtube_metadata(self) -> None:
+        metadata = get_mock_metadata("https://example.com/watch?v=mock")
+
+        with self.assertRaises(AudioAcquisitionError) as context:
+            YtDlpAudioProvider(allow_audio_download=True).acquire(metadata)
+
+        self.assertEqual(
+            str(context.exception),
+            "yt-dlp audio provider currently supports YouTube only",
+        )
+
+    def test_ytdlp_audio_provider_requires_existing_workspace(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing_workspace = Path(temp_dir) / "missing-signature-secret-token"
+            with self.assertRaises(AudioAcquisitionError) as context:
+                YtDlpAudioProvider(
+                    workspace_dir=missing_workspace,
+                    allow_audio_download=True,
+                ).acquire(metadata)
+
+        message = str(context.exception)
+        self.assertEqual(message, "audio workspace directory required")
+        _assert_sensitive_audio_error_not_leaked(self, message)
+
+    def test_ytdlp_audio_provider_returns_temporary_audio_artifact(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            output_path = workspace / "video2knowledge-real123.m4a"
+            fake_module, fake_ydl_class = _fake_audio_ytdlp_module(output_path)
+
+            with mock.patch.dict(sys.modules, {"yt_dlp": fake_module}):
+                artifact = YtDlpAudioProvider(
+                    workspace_dir=workspace,
+                    allow_audio_download=True,
+                    timeout_seconds=17,
+                ).acquire(metadata)
+
+            instance = fake_ydl_class.instances[0]
+            self.assertEqual(
+                instance.extract_calls,
+                [(metadata.source_url, True)],
+            )
+            self.assertEqual(instance.opts["format"], "bestaudio")
+            self.assertTrue(instance.opts["noplaylist"])
+            self.assertFalse(instance.opts["writesubtitles"])
+            self.assertFalse(instance.opts["writeautomaticsub"])
+            self.assertFalse(instance.opts["writethumbnail"])
+            self.assertEqual(instance.opts["postprocessors"], [])
+            self.assertTrue(instance.opts["ignoreconfig"])
+            self.assertEqual(instance.opts["socket_timeout"], 17)
+            self.assertEqual(artifact.path, output_path.resolve())
+            self.assertEqual(artifact.provider, YT_DLP_AUDIO_PROVIDER_ID)
+            self.assertEqual(artifact.format, "m4a")
+            self.assertTrue(artifact.temporary)
+
+    def test_ytdlp_audio_provider_sanitizes_backend_failure(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_module, _ = _fake_audio_ytdlp_module(
+                Path(temp_dir) / "unused.m4a",
+                error=RuntimeError(
+                    "https://example.com/audio?signature=secret&token=hidden stderr"
+                ),
+            )
+            with mock.patch.dict(sys.modules, {"yt_dlp": fake_module}):
+                with self.assertRaises(AudioAcquisitionError) as context:
+                    YtDlpAudioProvider(
+                        workspace_dir=temp_dir,
+                        allow_audio_download=True,
+                    ).acquire(metadata)
+
+        message = str(context.exception)
+        self.assertEqual(message, "yt-dlp audio acquisition failed")
+        _assert_sensitive_audio_error_not_leaked(self, message)
+
+    def test_ytdlp_audio_provider_sanitizes_timeout(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_module, _ = _fake_audio_ytdlp_module(
+                Path(temp_dir) / "unused.m4a",
+                error=TimeoutError("https://example.com/?signature=secret"),
+            )
+            with mock.patch.dict(sys.modules, {"yt_dlp": fake_module}):
+                with self.assertRaises(AudioAcquisitionError) as context:
+                    YtDlpAudioProvider(
+                        workspace_dir=temp_dir,
+                        allow_audio_download=True,
+                    ).acquire(metadata)
+
+        self.assertEqual(str(context.exception), "yt-dlp audio acquisition timed out")
+
+    def test_ytdlp_audio_provider_rejects_missing_or_external_output(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+        with tempfile.TemporaryDirectory() as temp_dir:
+            external_output = Path(temp_dir).parent / "signature-secret-token-hidden.m4a"
+            fake_module, _ = _fake_audio_ytdlp_module(
+                external_output,
+                create_output=False,
+            )
+            with mock.patch.dict(sys.modules, {"yt_dlp": fake_module}):
+                with self.assertRaises(AudioAcquisitionError) as context:
+                    YtDlpAudioProvider(
+                        workspace_dir=temp_dir,
+                        allow_audio_download=True,
+                    ).acquire(metadata)
+
+        message = str(context.exception)
+        self.assertEqual(message, "yt-dlp audio artifact missing")
+        _assert_sensitive_audio_error_not_leaked(self, message)
+
     def test_mock_audio_normalizer_does_not_create_media_file(self) -> None:
         artifact = AudioArtifact(
             path=Path("mock-audio.wav"),
@@ -1037,6 +1161,39 @@ def _fake_ytdlp_module(raw_info: dict[str, object]):
 
         def sanitize_info(self, info):
             return info
+
+    return types.SimpleNamespace(YoutubeDL=FakeYoutubeDL), FakeYoutubeDL
+
+
+def _fake_audio_ytdlp_module(
+    output_path: Path,
+    error: Exception | None = None,
+    create_output: bool = True,
+):
+    class FakeYoutubeDL:
+        instances = []
+
+        def __init__(self, opts):
+            self.opts = opts
+            self.extract_calls = []
+            FakeYoutubeDL.instances.append(self)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def extract_info(self, url, download):
+            self.extract_calls.append((url, download))
+            if error is not None:
+                raise error
+            if create_output:
+                output_path.write_bytes(b"mock audio artifact")
+            return {"requested_downloads": [{"filepath": str(output_path)}]}
+
+        def prepare_filename(self, info):
+            return str(output_path)
 
     return types.SimpleNamespace(YoutubeDL=FakeYoutubeDL), FakeYoutubeDL
 

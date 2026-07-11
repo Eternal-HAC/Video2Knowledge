@@ -276,3 +276,20 @@ Not implemented:
 Next target:
 
 - Plan the real audio acquisition boundary as a separate, explicitly permitted stage before integrating real local ASR.
+
+## 2026-07-11
+
+Status: `v0.5.2a YouTube Audio Acquisition Provider Boundary` implementation complete.
+
+Changes:
+
+- Added `YtDlpAudioProvider` using the yt-dlp Python API for a single YouTube audio-only artifact.
+- Download permission defaults to disabled and is checked before loading or invoking yt-dlp.
+- Disabled playlist, subtitle, automatic subtitle, thumbnail, configuration-file, and postprocessor behavior.
+- Returned artifacts are temporary and must remain inside the supplied or system temporary destination directory.
+- Kept `real-fallback`, pipeline, CLI, ffmpeg execution, Whisper, cache retention, and workspace cleanup unchanged.
+
+Validation target:
+
+- Unit tests mock yt-dlp and do not access the network or download media.
+- Mock CLI regression remains unchanged.
