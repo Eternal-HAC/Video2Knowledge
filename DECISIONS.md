@@ -390,3 +390,54 @@ This stage remains local-only. Future network acquisition must default to disabl
 
 Follow-up Review:
 Implement and review these requirements in the separate network audio acquisition stage.
+
+## 2026-07-11
+
+Decision:
+Define the future `yt_dlp_audio` contract before implementing network-backed audio acquisition.
+
+Reason:
+Real acquisition introduces explicit user permission, temporary workspace ownership, cache retention, cleanup on failure, and credential-bearing provider errors. These rules must be stable before any download behavior is added or connected to `real-fallback`.
+
+Alternatives:
+Implement yt-dlp audio download first and derive lifecycle rules from the implementation, or add download permission directly to the CLI and pipeline in the same stage.
+
+Impact:
+The future provider keeps the existing `AudioProvider.acquire(metadata) -> AudioArtifact` contract. Provider configuration supplies `allow_audio_download`, `keep_cache`, workspace location, and timeout. Download permission defaults to false and is checked before network or filesystem side effects. Temporary acquisition returns `temporary=True`; separately approved retained cache returns `temporary=False`.
+
+Follow-up Review:
+Validate the contract with mocked backend tests before any user-approved live download test.
+
+## 2026-07-11
+
+Decision:
+Assign cleanup ownership to a future `AudioWorkspace`, not to `AudioArtifact`, individual downstream providers, or user-owned local files.
+
+Reason:
+Acquisition, normalization, and transcription can fail independently. A single workspace owner can clean temporary artifacts reliably in a `finally` path without giving data objects destructive behavior or allowing one provider to delete another provider's external input.
+
+Alternatives:
+Add a `cleanup()` method to `AudioArtifact`, let each provider clean files opportunistically, or retain every downloaded and normalized artifact.
+
+Impact:
+The workspace cleans only files it created. `LocalFileAudioProvider` artifacts are never deleted. Default downloads and normalized outputs are temporary; cache retention requires separate explicit confirmation. Cleanup failures must remain sanitized and must not replace the original processing error.
+
+Follow-up Review:
+Implement `AudioWorkspace` together with the real acquisition provider so cleanup behavior is covered by success and failure tests.
+
+## 2026-07-11
+
+Decision:
+Keep future network audio acquisition behind the existing transcript fallback eligibility policy and strict error sanitization.
+
+Reason:
+HTTP 429, HTTP 403, network failures, generic transcript failures, and metadata contract errors do not prove that subtitles are unavailable and must not trigger media download. yt-dlp may also expose signed URLs, credentials, query parameters, temporary paths, commands, or stderr through raw exceptions.
+
+Alternatives:
+Download audio after every subtitle failure, expose raw yt-dlp errors for debugging, or reuse signed URLs from metadata.
+
+Impact:
+Only an eligible missing-subtitle or unsupported-format result plus explicit download permission may enter future `yt_dlp_audio`. Errors use stable categories and never expose full commands, signed URLs, cookies, tokens, auth headers, query parameters, temporary credentials, temporary paths, raw yt-dlp exceptions, or stderr.
+
+Follow-up Review:
+Preserve these boundaries when real acquisition is integrated with ffmpeg and local Whisper in separate stages.

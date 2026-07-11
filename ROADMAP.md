@@ -52,7 +52,8 @@ Status: Completed at `v0.3.0`.
 - [x] Add ffmpeg normalization boundary before real Whisper work.
 - [x] Validate the ffmpeg normalizer with a user-confirmed local smoke test.
 - [x] Add a local file audio provider boundary without copying user media.
-- [ ] Add an explicitly permitted network audio acquisition provider.
+- [x] Define the future `yt_dlp_audio` permission, lifecycle, cache, cleanup, and security contract.
+- [ ] Implement an explicitly permitted network audio acquisition provider.
 - [ ] Wire real ffmpeg normalization into an explicitly selected fallback path.
 - [ ] Add local Whisper or faster-whisper transcription behind the stable audio and transcript boundaries.
 - Keep local transcription separate from metadata and LLM work.

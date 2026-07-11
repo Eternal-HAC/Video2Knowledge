@@ -219,6 +219,60 @@ download behavior must default to disabled, use temporary artifacts by default,
 require separate confirmation to retain cache, and never expose signed URLs,
 cookies, tokens, auth headers, query parameters, or raw yt-dlp errors.
 
+## v0.5.1 Real Audio Acquisition Boundary Design
+
+The future `yt_dlp_audio` provider will continue to implement the existing
+`AudioProvider.acquire(metadata) -> AudioArtifact` contract. Provider-specific
+runtime policy will be supplied through constructor configuration rather than
+changing the shared protocol:
+
+```text
+YtDlpAudioProvider(
+    workspace_dir=None,
+    allow_audio_download=False,
+    keep_cache=False,
+    timeout_seconds=600,
+)
+```
+
+This is a design contract only. `YtDlpAudioProvider` is not implemented yet.
+
+Permission checks must happen before network access, workspace creation, or
+download backend invocation. `allow_audio_download` defaults to false, and
+`keep_cache=True` must never bypass the download permission gate.
+
+Default acquisition uses an `AudioWorkspace` backed by a system temporary
+directory and returns `AudioArtifact(temporary=True)`. Explicitly retained
+cache belongs under `output/cache/audio/<source_id>/` and returns
+`temporary=False`. Cache retention requires separate user confirmation, must
+not overwrite an existing artifact, and must not use a video title as an
+unsanitized filename.
+
+The future `AudioWorkspace` owns only artifacts created inside its workspace.
+It must clean temporary downloads and normalized files in a `finally` path
+after success or failure. It must never delete user-owned artifacts returned
+by `LocalFileAudioProvider`. Cleanup failure may produce a sanitized warning
+but must not hide the original acquisition, normalization, or transcription
+error.
+
+Future `real-fallback` integration remains outside this design stage:
+
+```text
+eligible official subtitle failure
+-> explicit audio permission gate
+-> yt_dlp_audio
+-> FfmpegAudioNormalizer
+-> real local Whisper backend
+-> TranscriptResult
+-> workspace cleanup
+```
+
+Platform access, network access, generic transcript, and metadata contract
+errors remain ineligible for audio acquisition. Provider errors must use stable
+sanitized categories and must not expose full commands, signed media URLs,
+query parameters, cookies, tokens, auth headers, temporary credentials,
+temporary paths, raw yt-dlp exceptions, or stderr.
+
 ## Current v0.5.x State
 
 Completed:
