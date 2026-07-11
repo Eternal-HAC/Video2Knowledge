@@ -78,5 +78,6 @@ cache/**/*.webp
 # Editors and OS
 .idea/
 .vscode/
+.ai/
 .DS_Store
 Thumbs.db
