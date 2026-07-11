@@ -107,3 +107,9 @@
 - Required explicit download permission and disabled playlists, subtitle and thumbnail writes, configuration files, and ffmpeg postprocessing.
 - Added mocked yt-dlp tests for permission, platform, workspace, success, timeout, output containment, and sanitized failures.
 - Kept `real-fallback`, pipeline, CLI, cache retention, and workspace cleanup unchanged.
+
+## 2026-07-11
+
+- Added `AudioWorkspace` for registered temporary audio artifact cleanup.
+- Added context-exit cleanup, reverse registration order, stable cleanup errors, and protection for local or workspace-external files.
+- Kept cache retention, yt-dlp execution, ffmpeg execution, Whisper, CLI, pipeline, and fallback integration out of the stage.

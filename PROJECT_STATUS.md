@@ -293,3 +293,19 @@ Validation target:
 
 - Unit tests mock yt-dlp and do not access the network or download media.
 - Mock CLI regression remains unchanged.
+
+## 2026-07-11
+
+Status: `v0.5.2b AudioWorkspace` implementation complete.
+
+Changes:
+
+- Added a private temporary workspace context manager for registered `temporary=True` audio artifacts.
+- Cleanup removes registered files in reverse order and only removes an empty workspace directory.
+- Cleanup runs after business errors without masking the original error.
+- User-owned local files, workspace-external files, directories, missing files, cache retention, and fallback integration remain outside the workspace cleanup scope.
+
+Validation target:
+
+- Unit tests use temporary test files only and do not access the network, yt-dlp, ffmpeg, or Whisper.
+- Mock CLI regression remains unchanged.

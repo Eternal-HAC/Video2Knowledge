@@ -47,6 +47,84 @@ class NormalizedAudio:
     temporary: bool
 
 
+class AudioWorkspace:
+    """Own a private temporary directory and its registered artifacts."""
+
+    def __init__(self) -> None:
+        self._path: Path | None = None
+        self._registered_paths: list[Path] = []
+        self._cleaned = False
+
+    def __enter__(self) -> "AudioWorkspace":
+        if self._path is not None:
+            raise AudioProcessingError("audio workspace is already active")
+        try:
+            self._path = Path(tempfile.mkdtemp(prefix="video2knowledge-audio-"))
+        except OSError as error:
+            raise AudioProcessingError("audio workspace creation failed") from error
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        try:
+            self.cleanup()
+        except AudioProcessingError:
+            if exc_type is None:
+                raise
+        return False
+
+    @property
+    def path(self) -> Path:
+        if self._path is None:
+            raise AudioProcessingError("audio workspace is not active")
+        return self._path
+
+    def register(self, artifact: AudioArtifact | NormalizedAudio) -> None:
+        if self._cleaned:
+            raise AudioProcessingError("audio workspace is closed")
+        if not artifact.temporary:
+            raise AudioProcessingError("audio workspace requires a temporary artifact")
+
+        artifact_path = artifact.path
+        if not artifact_path.exists():
+            raise AudioProcessingError("audio workspace artifact missing")
+        if not artifact_path.is_file():
+            raise AudioProcessingError("audio workspace artifact must be a file")
+
+        try:
+            workspace_path = self.path.resolve()
+            resolved_artifact = artifact_path.resolve()
+        except OSError as error:
+            raise AudioProcessingError("audio workspace artifact missing") from error
+        if not resolved_artifact.is_relative_to(workspace_path):
+            raise AudioProcessingError("audio workspace artifact must be inside the workspace")
+        if resolved_artifact not in self._registered_paths:
+            self._registered_paths.append(resolved_artifact)
+
+    def cleanup(self) -> None:
+        if self._cleaned:
+            return
+
+        cleanup_failed = False
+        for artifact_path in reversed(self._registered_paths):
+            try:
+                artifact_path.unlink()
+            except FileNotFoundError:
+                continue
+            except OSError:
+                cleanup_failed = True
+
+        try:
+            self.path.rmdir()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            cleanup_failed = True
+
+        if cleanup_failed:
+            raise AudioProcessingError("audio workspace cleanup failed")
+        self._cleaned = True
+
+
 class AudioProvider(Protocol):
     """Interface for obtaining audio before transcription."""
 

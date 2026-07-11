@@ -54,7 +54,8 @@ Status: Completed at `v0.3.0`.
 - [x] Add a local file audio provider boundary without copying user media.
 - [x] Define the future `yt_dlp_audio` permission, lifecycle, cache, cleanup, and security contract.
 - [x] Add a YouTube-only `yt_dlp_audio` provider boundary with mocked backend tests.
-- [ ] Add `AudioWorkspace` cleanup ownership and separately approved retained-cache behavior.
+- [x] Add `AudioWorkspace` cleanup ownership for registered temporary artifacts.
+- [ ] Add separately approved retained-cache behavior.
 - [ ] Run a separately confirmed live audio acquisition smoke test.
 - [ ] Wire real ffmpeg normalization into an explicitly selected fallback path.
 - [ ] Add local Whisper or faster-whisper transcription behind the stable audio and transcript boundaries.

@@ -246,19 +246,20 @@ reported file exists inside the supplied workspace. It does not run ffmpeg,
 Whisper, or cleanup logic. Its optional workspace argument is only a destination
 directory; ownership and lifecycle management remain deferred.
 
-When no workspace is supplied, the provider uses the system temporary directory
-and still returns `AudioArtifact(temporary=True)`. No cache-retention behavior
-exists in this stage. A future retained cache belongs under
+When no workspace is supplied, the provider creates a unique directory under
+the system temporary location and still returns `AudioArtifact(temporary=True)`.
+No cache-retention behavior exists in this stage. A future retained cache belongs under
 `output/cache/audio/<source_id>/`, requires separate explicit confirmation,
 must not overwrite an existing artifact, and must not use a video title as an
 unsanitized filename.
 
-The future `AudioWorkspace` owns only artifacts created inside its workspace.
-It must clean temporary downloads and normalized files in a `finally` path
-after success or failure. It must never delete user-owned artifacts returned
-by `LocalFileAudioProvider`. Cleanup failure may produce a sanitized warning
-but must not hide the original acquisition, normalization, or transcription
-error.
+`AudioWorkspace` owns only registered `temporary=True` artifacts inside its
+private temporary directory. It cleans registered files in reverse order and
+then removes the empty workspace directory on context exit, including after a
+business error. It never deletes user-owned artifacts returned by
+`LocalFileAudioProvider`, does not recursively delete unknown files, and does
+not hide a business error when cleanup also fails. Cache retention remains
+outside this stage.
 
 Future `real-fallback` integration remains outside this stage:
 
@@ -290,11 +291,12 @@ Completed:
 - Local ffmpeg and ffprobe smoke test.
 - Local file audio provider boundary for user-owned files.
 - YouTube-only `yt_dlp_audio` provider boundary with mocked backend tests.
+- AudioWorkspace lifecycle boundary for registered temporary artifacts.
 
 Not implemented:
 
 - A user-confirmed live audio acquisition test.
-- Workspace cleanup ownership or retained audio cache.
+- Retained audio cache.
 - Selection of real ffmpeg normalization in `real-fallback`.
 - Real Whisper or faster-whisper execution.
 - Transcript API fallback.

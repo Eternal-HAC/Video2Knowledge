@@ -458,3 +458,20 @@ Impact:
 
 Follow-up Review:
 Add `AudioWorkspace` cleanup ownership and separately approved cache retention before integrating acquisition with ffmpeg, Whisper, or `real-fallback`.
+
+## 2026-07-11
+
+Decision:
+Give `AudioWorkspace` ownership of only registered temporary artifacts in a private temporary directory.
+
+Reason:
+Temporary acquisition and normalization files need deterministic cleanup, while user-owned local files and unknown files must never be removed incidentally. A small context manager provides this ownership boundary without adding pipeline orchestration, cache retention, or lifecycle enums.
+
+Alternatives:
+Let each provider delete its own output, use recursive workspace deletion, add cleanup methods to data artifacts, or defer cleanup until full fallback integration.
+
+Impact:
+`AudioWorkspace` creates a unique temporary directory, accepts only existing regular files with `temporary=True` inside that directory, and removes registered files in reverse order before removing the empty directory. It suppresses cleanup failure when a business exception is already active; otherwise it raises a stable `AudioProcessingError`. `LocalFileAudioProvider` artifacts cannot be registered or deleted.
+
+Follow-up Review:
+Integrate the workspace with explicitly selected acquisition and normalization only in a separate stage, then design separately approved cache retention.

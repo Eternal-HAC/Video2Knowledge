@@ -14,6 +14,7 @@ from unittest import mock
 
 from app.audio import (
     AudioArtifact,
+    AudioWorkspace,
     FfmpegAudioNormalizer,
     LOCAL_FILE_AUDIO_PROVIDER_ID,
     LocalFileAudioProvider,
@@ -740,6 +741,114 @@ Official subtitle text
                     ).acquire(metadata)
 
         self.assertEqual(str(context.exception), "yt-dlp audio artifact missing")
+
+    def test_audio_workspace_cleans_registered_temporary_artifacts(self) -> None:
+        workspace = AudioWorkspace()
+        with workspace:
+            audio_path = workspace.path / "source.m4a"
+            normalized_path = workspace.path / "source-16k-mono.wav"
+            audio_path.write_bytes(b"temporary audio")
+            normalized_path.write_bytes(b"temporary normalized audio")
+
+            workspace.register(_audio_artifact(audio_path))
+            workspace.register(
+                NormalizedAudio(
+                    path=normalized_path,
+                    provider="test_normalizer",
+                    format="wav",
+                    sample_rate=16000,
+                    channels=1,
+                    temporary=True,
+                )
+            )
+            workspace.register(_audio_artifact(audio_path))
+
+        self.assertFalse(audio_path.exists())
+        self.assertFalse(normalized_path.exists())
+        self.assertFalse(workspace.path.exists())
+        workspace.cleanup()
+
+    def test_audio_workspace_cleans_on_business_error_without_masking_it(self) -> None:
+        workspace = AudioWorkspace()
+
+        with self.assertRaisesRegex(RuntimeError, "primary failure"):
+            with workspace:
+                audio_path = workspace.path / "source.m4a"
+                audio_path.write_bytes(b"temporary audio")
+                workspace.register(_audio_artifact(audio_path))
+                raise RuntimeError("primary failure")
+
+        self.assertFalse(audio_path.exists())
+        self.assertFalse(workspace.path.exists())
+
+    def test_audio_workspace_cleanup_failure_does_not_mask_business_error(self) -> None:
+        workspace = AudioWorkspace()
+
+        with self.assertRaisesRegex(RuntimeError, "primary failure"):
+            with workspace:
+                unregistered_path = workspace.path / "unregistered.m4a"
+                unregistered_path.write_bytes(b"unregistered artifact")
+                raise RuntimeError("primary failure")
+
+        self.assertTrue(unregistered_path.exists())
+        unregistered_path.unlink()
+        workspace.cleanup()
+        self.assertFalse(workspace.path.exists())
+
+    def test_audio_workspace_reports_stable_cleanup_failure(self) -> None:
+        workspace = AudioWorkspace()
+
+        with self.assertRaises(AudioProcessingError) as context:
+            with workspace:
+                unregistered_path = workspace.path / "unregistered.m4a"
+                unregistered_path.write_bytes(b"unregistered artifact")
+
+        self.assertEqual(str(context.exception), "audio workspace cleanup failed")
+        unregistered_path.unlink()
+        workspace.cleanup()
+        self.assertFalse(workspace.path.exists())
+
+    def test_audio_workspace_rejects_non_temporary_and_invalid_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_path = Path(temp_dir) / "user-owned.m4a"
+            local_path.write_bytes(b"user-owned audio")
+            local_metadata = get_mock_metadata(str(local_path), platform="local")
+            local_artifact = LocalFileAudioProvider().acquire(local_metadata)
+            outside_path = Path(temp_dir) / "outside.m4a"
+            outside_path.write_bytes(b"outside audio")
+
+            with AudioWorkspace() as workspace:
+                with self.assertRaises(AudioProcessingError) as context:
+                    workspace.register(local_artifact)
+                self.assertEqual(
+                    str(context.exception),
+                    "audio workspace requires a temporary artifact",
+                )
+
+                with self.assertRaises(AudioProcessingError) as context:
+                    workspace.register(_audio_artifact(outside_path))
+                self.assertEqual(
+                    str(context.exception),
+                    "audio workspace artifact must be inside the workspace",
+                )
+
+                missing_path = workspace.path / "missing.m4a"
+                with self.assertRaises(AudioProcessingError) as context:
+                    workspace.register(_audio_artifact(missing_path))
+                self.assertEqual(str(context.exception), "audio workspace artifact missing")
+
+                directory_path = workspace.path / "directory"
+                directory_path.mkdir()
+                with self.assertRaises(AudioProcessingError) as context:
+                    workspace.register(_audio_artifact(directory_path))
+                self.assertEqual(
+                    str(context.exception),
+                    "audio workspace artifact must be a file",
+                )
+                directory_path.rmdir()
+
+            self.assertTrue(local_path.exists())
+            self.assertEqual(local_path.read_bytes(), b"user-owned audio")
 
     def test_mock_audio_normalizer_does_not_create_media_file(self) -> None:
         artifact = AudioArtifact(
