@@ -132,14 +132,12 @@ class YtDlpAudioProvider:
         if not self.allow_audio_download:
             raise AudioAcquisitionError("audio download permission required")
 
-        workspace = self.workspace_dir or Path(tempfile.gettempdir())
-        if not workspace.is_dir():
-            raise AudioAcquisitionError("audio workspace directory required")
-
         try:
             import yt_dlp
         except ImportError as error:
             raise AudioAcquisitionError("yt-dlp is not installed") from error
+
+        workspace = self._acquisition_workspace()
 
         ydl_opts = {
             "format": "bestaudio",
@@ -172,6 +170,16 @@ class YtDlpAudioProvider:
             format=output_path.suffix.lower().lstrip(".") or "unknown",
             temporary=True,
         )
+
+    def _acquisition_workspace(self) -> Path:
+        if self.workspace_dir is not None:
+            if not self.workspace_dir.is_dir():
+                raise AudioAcquisitionError("audio workspace directory required")
+            return self.workspace_dir
+        try:
+            return Path(tempfile.mkdtemp(prefix="video2knowledge-audio-"))
+        except OSError as error:
+            raise AudioAcquisitionError("audio workspace unavailable") from error
 
 
 class MockAudioNormalizer:
