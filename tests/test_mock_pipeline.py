@@ -15,6 +15,8 @@ from unittest import mock
 from app.audio import (
     AudioArtifact,
     FfmpegAudioNormalizer,
+    LOCAL_FILE_AUDIO_PROVIDER_ID,
+    LocalFileAudioProvider,
     MockAudioNormalizer,
     MockAudioProvider,
     NormalizedAudio,
@@ -22,6 +24,7 @@ from app.audio import (
 from app.cli import main, run_import_url
 from app.downloader import get_mock_metadata, get_metadata_with_provider
 from app.errors import (
+    AudioAcquisitionError,
     AudioProcessingError,
     FfmpegNotFoundError,
     MetadataProviderError,
@@ -507,6 +510,70 @@ Official subtitle text
         self.assertEqual(artifact.format, "wav")
         self.assertTrue(artifact.temporary)
         self.assertFalse(artifact.path.exists())
+
+    def test_local_file_audio_provider_returns_user_owned_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.M4A"
+            input_path.write_bytes(b"user-owned audio")
+            files_before = list(Path(temp_dir).iterdir())
+            metadata = get_mock_metadata(str(input_path), platform="local")
+
+            artifact = LocalFileAudioProvider().acquire(metadata)
+
+            self.assertEqual(artifact.path, input_path)
+            self.assertEqual(artifact.provider, LOCAL_FILE_AUDIO_PROVIDER_ID)
+            self.assertEqual(artifact.format, "m4a")
+            self.assertFalse(artifact.temporary)
+            self.assertEqual(input_path.read_bytes(), b"user-owned audio")
+            self.assertEqual(list(Path(temp_dir).iterdir()), files_before)
+
+    def test_local_file_audio_provider_uses_unknown_format_without_suffix(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input"
+            input_path.write_bytes(b"user-owned audio")
+            metadata = get_mock_metadata(str(input_path), platform="local")
+
+            artifact = LocalFileAudioProvider().acquire(metadata)
+
+        self.assertEqual(artifact.format, "unknown")
+        self.assertFalse(artifact.temporary)
+
+    def test_local_file_audio_provider_rejects_non_local_metadata(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+
+        with self.assertRaises(AudioAcquisitionError) as context:
+            LocalFileAudioProvider().acquire(metadata)
+
+        self.assertEqual(str(context.exception), "local audio input required")
+
+    def test_local_file_audio_provider_rejects_empty_input(self) -> None:
+        metadata = get_mock_metadata("", platform="local")
+
+        with self.assertRaises(AudioAcquisitionError) as context:
+            LocalFileAudioProvider().acquire(metadata)
+
+        self.assertEqual(str(context.exception), "local audio input required")
+
+    def test_local_file_audio_provider_reports_missing_file_without_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "signature-secret-token-hidden.m4a"
+            metadata = get_mock_metadata(str(input_path), platform="local")
+
+            with self.assertRaises(AudioAcquisitionError) as context:
+                LocalFileAudioProvider().acquire(metadata)
+
+        message = str(context.exception)
+        self.assertEqual(message, "local audio input file not found")
+        _assert_sensitive_audio_error_not_leaked(self, message)
+
+    def test_local_file_audio_provider_rejects_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            metadata = get_mock_metadata(temp_dir, platform="local")
+
+            with self.assertRaises(AudioAcquisitionError) as context:
+                LocalFileAudioProvider().acquire(metadata)
+
+        self.assertEqual(str(context.exception), "local audio input must be a file")
 
     def test_mock_audio_normalizer_does_not_create_media_file(self) -> None:
         artifact = AudioArtifact(

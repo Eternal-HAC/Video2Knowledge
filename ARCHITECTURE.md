@@ -191,6 +191,34 @@ local audio file
 
 This boundary is not wired into `real-fallback` by default. The fallback path still uses `MockAudioNormalizer`. The ffmpeg boundary does not download audio, run Whisper, access YouTube, use Transcript API fallback, or call LLMs. A separate user-confirmed local smoke test verified 16 kHz mono PCM WAV output.
 
+## v0.5.0e Local File Audio Provider Boundary
+
+`LocalFileAudioProvider` exposes a user-owned local file through the existing
+`AudioProvider -> AudioArtifact` contract:
+
+```text
+local VideoMetadata
+-> LocalFileAudioProvider
+-> AudioArtifact(temporary=False)
+```
+
+The provider validates only that the metadata describes a local source and that
+the source path exists as a file. It does not copy, modify, delete, inspect, or
+decode the file. Missing extensions use `format="unknown"` so codec detection
+remains an ffmpeg responsibility.
+
+The existing `AudioProvider.acquire(metadata)` interface and
+`AudioArtifact.temporary` flag remain sufficient for this stage. User-owned
+local files are never temporary and must not be cleaned up by the pipeline.
+Lifecycle enums and an `AudioWorkspace` context manager are deferred until
+real download and retained-cache lifecycles both exist.
+
+A future provider id `yt_dlp_audio` is reserved conceptually for explicitly
+permitted media acquisition. It is not implemented in this stage. Future
+download behavior must default to disabled, use temporary artifacts by default,
+require separate confirmation to retain cache, and never expose signed URLs,
+cookies, tokens, auth headers, query parameters, or raw yt-dlp errors.
+
 ## Current v0.5.x State
 
 Completed:
@@ -201,10 +229,11 @@ Completed:
 - Runtime cache and media artifact safety policy.
 - Real ffmpeg normalizer boundary for existing local audio.
 - Local ffmpeg and ffprobe smoke test.
+- Local file audio provider boundary for user-owned files.
 
 Not implemented:
 
-- Real audio acquisition.
+- Network-backed audio acquisition.
 - Selection of real ffmpeg normalization in `real-fallback`.
 - Real Whisper or faster-whisper execution.
 - Transcript API fallback.

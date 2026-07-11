@@ -9,11 +9,16 @@ import subprocess
 import tempfile
 from typing import Protocol
 
-from app.errors import AudioProcessingError, FfmpegNotFoundError
+from app.errors import (
+    AudioAcquisitionError,
+    AudioProcessingError,
+    FfmpegNotFoundError,
+)
 from app.models import VideoMetadata
 
 
 MOCK_AUDIO_PROVIDER_ID = "mock_audio_provider"
+LOCAL_FILE_AUDIO_PROVIDER_ID = "local_file_audio"
 MOCK_AUDIO_NORMALIZER_ID = "mock_ffmpeg_normalizer"
 FFMPEG_AUDIO_NORMALIZER_ID = "ffmpeg_audio_normalizer"
 
@@ -70,6 +75,29 @@ class MockAudioProvider:
             provider=self.provider_id,
             format="wav",
             temporary=True,
+        )
+
+
+class LocalFileAudioProvider:
+    """Expose a user-owned local audio file without copying or modifying it."""
+
+    provider_id = LOCAL_FILE_AUDIO_PROVIDER_ID
+
+    def acquire(self, metadata: VideoMetadata) -> AudioArtifact:
+        if metadata.platform.lower() != "local" or not metadata.source_url.strip():
+            raise AudioAcquisitionError("local audio input required")
+
+        input_path = Path(metadata.source_url)
+        if not input_path.exists():
+            raise AudioAcquisitionError("local audio input file not found")
+        if not input_path.is_file():
+            raise AudioAcquisitionError("local audio input must be a file")
+
+        return AudioArtifact(
+            path=input_path,
+            provider=self.provider_id,
+            format=input_path.suffix.lower().lstrip(".") or "unknown",
+            temporary=False,
         )
 
 

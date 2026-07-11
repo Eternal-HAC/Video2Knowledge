@@ -356,3 +356,37 @@ Metadata, subtitle acquisition, and ffmpeg do not consume LLM tokens. Local Whis
 
 Follow-up Review:
 Specify concrete provider configuration and cost visibility during `v0.6.x Knowledge Extraction`.
+
+## 2026-07-11
+
+Decision:
+Keep `AudioProvider.acquire(metadata)` and `AudioArtifact.temporary` unchanged while adding `LocalFileAudioProvider`.
+
+Reason:
+The current metadata contract already carries the local input path through `source_url`, and the local provider only needs to validate and expose that user-owned file. Introducing an acquisition request object, lifecycle enum, workspace manager, or permission-specific exception before any network download exists would add abstractions without current behavior to support them.
+
+Alternatives:
+Introduce `AudioAcquisitionRequest`, replace `temporary` with a lifecycle enum, or build cache and cleanup orchestration during the local file boundary stage.
+
+Impact:
+`LocalFileAudioProvider` returns an `AudioArtifact` with provider id `local_file_audio` and `temporary=False`. It never copies, modifies, deletes, decodes, or cleans up the source file. Files without extensions use `format="unknown"`. The existing Mock audio path and default `real-fallback` behavior remain unchanged.
+
+Follow-up Review:
+Re-evaluate the request and lifecycle models when a real `yt_dlp_audio` provider introduces temporary downloads and explicitly retained cache.
+
+## 2026-07-11
+
+Decision:
+Document `yt_dlp_audio` as a future explicitly permitted provider without adding a placeholder implementation.
+
+Reason:
+A placeholder class would not validate real download behavior and could imply that network acquisition is available. Permission gating, temporary workspace ownership, cleanup, cache retention, and sanitized yt-dlp failures should be designed against the actual implementation stage.
+
+Alternatives:
+Add a provider class that always raises not implemented, or implement yt-dlp audio download in `v0.5.0e`.
+
+Impact:
+This stage remains local-only. Future network acquisition must default to disabled, require explicit user permission, create temporary artifacts by default, require separate confirmation to retain cache, and avoid exposing signed URLs, cookies, tokens, auth headers, sensitive query parameters, or raw yt-dlp errors.
+
+Follow-up Review:
+Implement and review these requirements in the separate network audio acquisition stage.
