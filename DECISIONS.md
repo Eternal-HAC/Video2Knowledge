@@ -305,3 +305,54 @@ The project can normalize existing local audio files through a tested boundary w
 
 Follow-up Review:
 Run a separate user-confirmed local ffmpeg smoke test before using the boundary with real audio.
+
+## 2026-07-11
+
+Decision:
+Define Video2Knowledge as a Local First video-to-knowledge pipeline and make the `v1.0` product boundary a complete path from a supported YouTube URL or local media file to structured Markdown.
+
+Reason:
+The product should be judged by whether it creates durable local knowledge artifacts, not by whether it resembles a downloader, standalone transcription script, or generic chat summarizer. A useful `v1.0` nevertheless requires the supporting capabilities that complete that knowledge workflow: necessary and explicitly permitted media acquisition, ffmpeg normalization, local ASR fallback, LLM knowledge extraction, and local or Obsidian-friendly export.
+
+Alternatives:
+Exclude media acquisition, local ASR, or LLM extraction from `v1.0`; position the product as a downloader, Whisper wrapper, or generic summary tool; or include browser, mobile, multi-platform ingestion, cloud sync, and skill generation in the first production milestone.
+
+Impact:
+`v1.0` includes clean YouTube URL input, local video/audio input, metadata, official subtitles first, explicitly permitted audio acquisition when needed, ffmpeg normalization, local Whisper/faster-whisper fallback, `TranscriptResult`, replaceable LLM knowledge extraction, structured Markdown, and local or Obsidian-friendly export. It excludes all-platform support, full Bilibili support, arbitrary-web ingestion, browser and mobile applications, authenticated course capture, DRM circumvention, cookie/session ingestion by default, skill generation, SaaS accounts, billing, and cloud synchronization.
+
+Follow-up Review:
+Review the boundary at the end of `v0.6.x Knowledge Extraction` before finalizing the remaining `v1.0` export and production-readiness work.
+
+## 2026-07-11
+
+Decision:
+Keep basic URL intake in `v1.0`, and defer broad platform normalization, browser capture, and mobile processing to later versions.
+
+Reason:
+The current pipeline needs a reliable clean YouTube URL path, not a generic ingestion framework. Share-text parsing, tracking cleanup, short-link handling, multi-platform recognition, browser capture, and mobile processing add separate product, security, and platform concerns.
+
+Alternatives:
+Add full URL normalization and browser or mobile capture during `v0.5.x`, or require users to manually download every video before import.
+
+Impact:
+`v1.0` performs minimum validation for clean YouTube URLs and accepts local media directly. `v1.x` may add share-text extraction, tracking cleanup, position-parameter preservation, Chinese and mobile link handling, Bilibili adapters, and an authorized browser capture layer. Mobile remains an input and reading surface first, while ffmpeg, ASR, and knowledge processing run primarily on a PC or local service.
+
+Follow-up Review:
+Revisit after the core `v1.0` pipeline is stable and platform expansion becomes an explicit stage.
+
+## 2026-07-11
+
+Decision:
+Describe cost boundaries by processing stage and support replaceable user-controlled LLM providers without promising universally zero-cost operation.
+
+Reason:
+Metadata, subtitles, ffmpeg, local ASR, and LLM extraction have different resource profiles. Local execution can avoid cloud LLM tokens but still consumes compute, storage, time, networking, and potentially third-party services.
+
+Alternatives:
+Treat every stage as an LLM cost, promise all-local operation is always free, or bind the product to one hosted LLM provider.
+
+Impact:
+Metadata, subtitle acquisition, and ffmpeg do not consume LLM tokens. Local Whisper/faster-whisper consumes local resources. Token cost begins primarily at knowledge extraction. The provider boundary can support user-provided API keys and future local or open-source models, while product documentation avoids absolute cost claims.
+
+Follow-up Review:
+Specify concrete provider configuration and cost visibility during `v0.6.x Knowledge Extraction`.

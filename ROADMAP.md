@@ -50,6 +50,8 @@ Status: Completed at `v0.3.0`.
 - Add Mock audio acquisition and normalization boundaries before real media work.
 - Add cache/temp safety policy before real media work.
 - Add ffmpeg normalization boundary before real Whisper work.
+- Add explicitly permitted audio acquisition for eligible fallback cases.
+- Add local Whisper or faster-whisper transcription behind the stable audio and transcript boundaries.
 - Add local Whisper fallback only after transcript acquisition is stable.
 - Keep local transcription separate from metadata and LLM work.
 - Require explicit future confirmation before audio acquisition or dependency installation.
@@ -77,5 +79,35 @@ Status: Completed at `v0.3.0`.
 
 ### v1.0 Production Ready MVP
 
-- Stable local pipeline from supported source to structured Markdown.
-- Reliable validation for metadata, transcript, extraction, and export paths.
+- Accept clean YouTube URLs and local video or audio files.
+- Extract metadata and prefer official subtitles.
+- Acquire necessary audio only when subtitles are unavailable and the user explicitly permits it.
+- Normalize audio through ffmpeg and use local Whisper or faster-whisper as the ASR fallback.
+- Produce a stable `TranscriptResult`.
+- Run LLM knowledge extraction through a replaceable provider boundary using a user-provided API key where applicable.
+- Generate structured Markdown and export to a local folder or Obsidian-friendly destination.
+- Reliably validate metadata, transcript, ASR, extraction, and export paths.
+
+Out of scope for `v1.0`:
+
+- All-platform support and full Bilibili support.
+- Generic arbitrary-web ingestion.
+- Browser extension and mobile application.
+- Authenticated course capture, DRM circumvention, or cookie/session ingestion by default.
+- Skill generator.
+- SaaS account, billing, and cloud synchronization.
+
+### v1.x Platform and Capture Expansion
+
+- Extract URLs from complete share text.
+- Identify multiple platforms and add Bilibili or other adapters.
+- Clean tracking parameters while preserving meaningful video-position parameters.
+- Support Chinese share copy, short links, and mobile links.
+- Explore a browser capture layer that submits authorized URLs, page metadata, and tasks to the local service.
+- Treat mobile as a link collection, task submission, and reading surface rather than the primary ffmpeg or ASR runtime.
+- Keep authentication, DRM, and content-rights boundaries explicit.
+
+### Future Knowledge Distillation
+
+- Explore optional method-card or skill-pack export after the core `v1.0` pipeline and base knowledge extraction are stable.
+- Keep skill generation downstream from structured Markdown and outside the `v1.0` scope.

@@ -2,18 +2,39 @@
 
 ## Overview
 
-Video2Knowledge is designed as a local pipeline with replaceable provider modules.
+Video2Knowledge is a Local First video-to-knowledge pipeline with replaceable provider modules. Its primary output is structured Markdown for local PKM systems such as Obsidian.
 
 ```text
-Video URL / local video
+Supported URL / local video or audio
 -> platform adapter
 -> downloader / metadata resolver
 -> subtitle acquisition
--> Whisper fallback
--> summarizer
+-> explicitly permitted audio acquisition when needed
+-> ffmpeg normalization
+-> local ASR fallback
+-> LLM knowledge extraction
 -> Markdown writer
 -> local exporter
 ```
+
+The standard user workflow begins with a supported URL or local media file. It must not require manual video download as a normal prerequisite.
+
+## v1.0 Pipeline Contract
+
+The `v1.0` processing priority is:
+
+```text
+metadata
+-> official subtitles
+-> another explicitly supported transcript source
+-> audio acquisition only when needed and explicitly permitted
+-> ffmpeg normalization
+-> local ASR
+-> LLM knowledge extraction
+-> structured Markdown export
+```
+
+The acquisition boundary exists to support knowledge processing, not to turn the product into a general-purpose downloader. Local ASR exists as a fallback, not as a standalone transcription product. LLM providers own extraction calls, while the pipeline owns orchestration and structured Markdown remains the durable output.
 
 ## Stage 1 Mock Flow
 
@@ -69,6 +90,10 @@ real subtitle stage, when provider-specific inputs and failure modes are known.
 - Prefer mature external infrastructure for media processing later.
 - Put project value in knowledge extraction and durable output.
 - Keep provider APIs replaceable.
+- Prefer official subtitles before acquiring media.
+- Require explicit permission before media acquisition or retained media cache.
+- Keep browser and mobile clients as optional capture or reading surfaces around the local core.
+- Do not claim support for arbitrary websites or all video platforms.
 
 ## v0.3.x Real Metadata
 
@@ -162,4 +187,18 @@ local audio file
 -> NormalizedAudio
 ```
 
-This boundary is not wired into `real-fallback` by default. The fallback path still uses `MockAudioNormalizer`. The ffmpeg boundary does not download audio, run Whisper, access YouTube, use Transcript API fallback, or call LLMs. Live local ffmpeg validation is deferred to a separate user-confirmed smoke test.
+This boundary is not wired into `real-fallback` by default. The fallback path still uses `MockAudioNormalizer`. The ffmpeg boundary does not download audio, run Whisper, access YouTube, use Transcript API fallback, or call LLMs. A separate user-confirmed local smoke test verified 16 kHz mono PCM WAV output.
+
+## URL Intake Boundaries
+
+`v1.0` accepts clean YouTube URLs with minimum validation needed by the current pipeline. Full share-text parsing, tracking-parameter cleanup, short-link expansion, mobile-link handling, video-position preservation, and multi-platform normalization belong to `v1.x` platform expansion. They must not be folded into the current `v0.5.x` audio and ASR work.
+
+## Future Capture and Mobile Surfaces
+
+A future browser extension may submit URLs, page metadata, and tasks to a local service. It may assist content capture only where the user is authenticated and authorized. It must not bypass authentication, circumvent DRM, or replace the local processing core.
+
+Mobile is an input and reading surface first. Link collection, task submission, and note reading may run on mobile, while ffmpeg, local ASR, and knowledge extraction remain primarily on a PC or local service.
+
+## Cost Boundaries
+
+Metadata, subtitle acquisition, and ffmpeg do not consume LLM tokens. Local Whisper or faster-whisper consumes local compute, storage, and time rather than cloud LLM tokens. Token cost begins primarily at LLM knowledge extraction. Replaceable providers should support user-provided API keys and may later support local models, but the architecture does not promise zero-cost operation.
