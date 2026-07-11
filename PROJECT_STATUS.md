@@ -309,3 +309,17 @@ Validation target:
 
 - Unit tests use temporary test files only and do not access the network, yt-dlp, ffmpeg, or Whisper.
 - Mock CLI regression remains unchanged.
+
+## 2026-07-12
+
+Status: `YtDlpAudioProvider` workspace validation ordering fix complete.
+
+Changes:
+
+- Validate a supplied workspace before importing the optional yt-dlp dependency.
+- Keep invalid workspace errors stable regardless of whether yt-dlp is installed.
+- Clarify the historical and current `AudioWorkspace` status in architecture documentation.
+
+Validation target:
+
+- Targeted provider tests and the full standard test suite pass without installing yt-dlp or accessing the network.

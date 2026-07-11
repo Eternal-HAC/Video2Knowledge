@@ -210,8 +210,9 @@ remains an ffmpeg responsibility.
 The existing `AudioProvider.acquire(metadata)` interface and
 `AudioArtifact.temporary` flag remain sufficient for this stage. User-owned
 local files are never temporary and must not be cleaned up by the pipeline.
-Lifecycle enums and an `AudioWorkspace` context manager are deferred until
-real download and retained-cache lifecycles both exist.
+At this historical stage, lifecycle enums and an `AudioWorkspace` context
+manager were deferred. `AudioWorkspace` was subsequently implemented in
+`v0.5.2b`; lifecycle enums and retained-cache behavior remain deferred.
 
 A future provider id `yt_dlp_audio` is reserved conceptually for explicitly
 permitted media acquisition. It is not implemented in this stage. Future
@@ -244,7 +245,8 @@ automatic subtitles, thumbnails, yt-dlp configuration files, and postprocessors
 disabled. It returns a temporary `AudioArtifact` only after confirming that the
 reported file exists inside the supplied workspace. It does not run ffmpeg,
 Whisper, or cleanup logic. Its optional workspace argument is only a destination
-directory; ownership and lifecycle management remain deferred.
+directory; the provider does not own cleanup. `AudioWorkspace`, added in the
+subsequent `v0.5.2b` stage, owns cleanup only for registered temporary artifacts.
 
 When no workspace is supplied, the provider creates a unique directory under
 the system temporary location and still returns `AudioArtifact(temporary=True)`.

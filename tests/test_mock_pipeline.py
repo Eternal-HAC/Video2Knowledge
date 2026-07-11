@@ -12,6 +12,8 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from unittest import mock
 
+_ORIGINAL_IMPORT = __import__
+
 from app.audio import (
     AudioArtifact,
     AudioWorkspace,
@@ -608,15 +610,55 @@ Official subtitle text
 
         with tempfile.TemporaryDirectory() as temp_dir:
             missing_workspace = Path(temp_dir) / "missing-signature-secret-token"
-            with self.assertRaises(AudioAcquisitionError) as context:
-                YtDlpAudioProvider(
-                    workspace_dir=missing_workspace,
-                    allow_audio_download=True,
-                ).acquire(metadata)
+            with mock.patch(
+                "builtins.__import__",
+                side_effect=_reject_ytdlp_import,
+            ):
+                with self.assertRaises(AudioAcquisitionError) as context:
+                    YtDlpAudioProvider(
+                        workspace_dir=missing_workspace,
+                        allow_audio_download=True,
+                    ).acquire(metadata)
 
         message = str(context.exception)
         self.assertEqual(message, "audio workspace directory required")
         _assert_sensitive_audio_error_not_leaked(self, message)
+
+    def test_ytdlp_audio_provider_rejects_workspace_file_before_import(self) -> None:
+        metadata = _youtube_metadata_with_raw({})
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace_file = Path(temp_dir) / "workspace-file"
+            workspace_file.write_text("not a directory", encoding="utf-8")
+            with mock.patch(
+                "builtins.__import__",
+                side_effect=_reject_ytdlp_import,
+            ):
+                with self.assertRaises(AudioAcquisitionError) as context:
+                    YtDlpAudioProvider(
+                        workspace_dir=workspace_file,
+                        allow_audio_download=True,
+                    ).acquire(metadata)
+
+        self.assertEqual(
+            str(context.exception),
+            "audio workspace directory required",
+        )
+
+    def test_ytdlp_audio_provider_reports_missing_dependency_for_valid_workspace(
+        self,
+    ) -> None:
+        metadata = _youtube_metadata_with_raw({})
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with mock.patch.dict(sys.modules, {"yt_dlp": None}):
+                with self.assertRaises(AudioAcquisitionError) as context:
+                    YtDlpAudioProvider(
+                        workspace_dir=temp_dir,
+                        allow_audio_download=True,
+                    ).acquire(metadata)
+
+        self.assertEqual(str(context.exception), "yt-dlp is not installed")
 
     def test_ytdlp_audio_provider_returns_temporary_audio_artifact(self) -> None:
         metadata = _youtube_metadata_with_raw({})
@@ -1347,6 +1389,18 @@ def _fake_audio_ytdlp_module(
             return str(output_path)
 
     return types.SimpleNamespace(YoutubeDL=FakeYoutubeDL), FakeYoutubeDL
+
+
+def _reject_ytdlp_import(
+    name: str,
+    globals: object = None,
+    locals: object = None,
+    fromlist: tuple[object, ...] = (),
+    level: int = 0,
+) -> object:
+    if name == "yt_dlp":
+        raise AssertionError("yt_dlp must not be imported for an invalid workspace")
+    return _ORIGINAL_IMPORT(name, globals, locals, fromlist, level)
 
 
 def _youtube_metadata_with_raw(raw_metadata: dict[str, object]):

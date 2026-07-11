@@ -210,12 +210,17 @@ class YtDlpAudioProvider:
         if not self.allow_audio_download:
             raise AudioAcquisitionError("audio download permission required")
 
+        workspace = None
+        if self.workspace_dir is not None:
+            workspace = self._acquisition_workspace()
+
         try:
             import yt_dlp
         except ImportError as error:
             raise AudioAcquisitionError("yt-dlp is not installed") from error
 
-        workspace = self._acquisition_workspace()
+        if workspace is None:
+            workspace = self._acquisition_workspace()
 
         ydl_opts = {
             "format": "bestaudio",
