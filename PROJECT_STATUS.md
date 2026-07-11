@@ -252,3 +252,27 @@ Validation:
 Next target:
 
 - Continue planning the next explicit audio or Whisper integration stage without changing the default `real-fallback` Mock behavior.
+
+## 2026-07-11
+
+Status: Project documentation aligned with the current `v0.5.x Whisper Fallback` implementation.
+
+Current implementation:
+
+- Latest tagged release remains `v0.4.0 Official Transcript`.
+- `v0.5.x` fallback policy, Mock Whisper fallback, Mock audio boundaries, cache safety policy, and ffmpeg normalizer boundary are complete.
+- The local ffmpeg smoke test passed and verified 16 kHz mono `pcm_s16le` WAV output.
+- The default `real-fallback` path still uses Mock audio normalization and Mock Whisper.
+
+Not implemented:
+
+- Real audio acquisition.
+- Real ffmpeg processing in the default fallback chain.
+- Real Whisper or faster-whisper execution.
+- Transcript API fallback.
+- LLM knowledge extraction.
+- Automated Obsidian import/update behavior or external knowledge-base synchronization.
+
+Next target:
+
+- Plan the real audio acquisition boundary as a separate, explicitly permitted stage before integrating real local ASR.

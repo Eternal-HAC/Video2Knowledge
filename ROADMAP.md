@@ -45,14 +45,15 @@ Status: Completed at `v0.3.0`.
 
 ### v0.5.x Whisper Fallback
 
-- Start with fallback policy and error taxonomy.
-- Add a Mock Whisper fallback pipeline before real media work.
-- Add Mock audio acquisition and normalization boundaries before real media work.
-- Add cache/temp safety policy before real media work.
-- Add ffmpeg normalization boundary before real Whisper work.
-- Add explicitly permitted audio acquisition for eligible fallback cases.
-- Add local Whisper or faster-whisper transcription behind the stable audio and transcript boundaries.
-- Add local Whisper fallback only after transcript acquisition is stable.
+- [x] Define fallback policy and error taxonomy.
+- [x] Add a Mock Whisper fallback pipeline before real media work.
+- [x] Add Mock audio acquisition and normalization boundaries before real media work.
+- [x] Add cache/temp safety policy before real media work.
+- [x] Add ffmpeg normalization boundary before real Whisper work.
+- [x] Validate the ffmpeg normalizer with a user-confirmed local smoke test.
+- [ ] Add a real audio acquisition boundary with explicit user permission.
+- [ ] Wire real ffmpeg normalization into an explicitly selected fallback path.
+- [ ] Add local Whisper or faster-whisper transcription behind the stable audio and transcript boundaries.
 - Keep local transcription separate from metadata and LLM work.
 - Require explicit future confirmation before audio acquisition or dependency installation.
 

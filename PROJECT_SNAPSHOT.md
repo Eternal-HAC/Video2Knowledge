@@ -2,7 +2,7 @@
 
 ## Snapshot Date
 
-2026-07-08
+2026-07-11
 
 ## Current Version
 
@@ -12,11 +12,11 @@ Official Transcript
 
 ## Project
 
-Video2Knowledge is a Local First AI/PKM tool that converts videos into structured Markdown knowledge notes.
+Video2Knowledge is a Local First video-to-knowledge pipeline that converts supported video or audio sources into structured Markdown knowledge notes.
 
 ## Current Stage
 
-Official transcript baseline completed. The next implementation stage is `v0.5.x Whisper Fallback`.
+The latest tagged release is `v0.4.0 Official Transcript`. Development is currently in `v0.5.x Whisper Fallback`, with policy, Mock fallback, audio boundaries, cache safety, and local ffmpeg normalization validated.
 
 ## Completed
 
@@ -35,6 +35,7 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 - Mock audio acquisition and normalization boundaries for the fallback path.
 - Cache/temp safety policy for future audio acquisition.
 - ffmpeg audio normalizer boundary for existing local audio files.
+- User-confirmed local ffmpeg smoke test with `ffprobe` validation of 16 kHz mono `pcm_s16le` WAV output.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -72,9 +73,10 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 
 ## Next Steps
 
-1. Review and commit `v0.5.0d ffmpeg Normalizer Boundary`.
-2. Plan a user-confirmed local ffmpeg smoke test or the real audio acquisition boundary.
-3. Keep faster-whisper, Transcript API fallback, LLM, and export work out of the next audio boundary stage.
+1. Plan the real audio acquisition boundary with explicit user permission and sanitized runtime behavior.
+2. Keep the existing default `real-fallback` Mock-only until a separate integration stage is approved.
+3. Add real Whisper or faster-whisper only after acquisition and cleanup behavior are stable.
+4. Keep Transcript API fallback, LLM extraction, and export expansion in separate stages.
 
 ## Live Validation Notes
 
@@ -84,6 +86,8 @@ Official transcript baseline completed. The next implementation stage is `v0.5.x
 - Provider: `yt_dlp_official_subtitles`
 - Attempted providers: `["yt_dlp_official_subtitles"]`
 - Output was Markdown only; no video, audio, subtitle, thumbnail, or other media artifacts were found.
+- Local ffmpeg validation used an existing user-approved audio file and produced an ignored runtime WAV artifact under `output/cache/audio/`.
+- `ffprobe` confirmed `pcm_s16le`, `16000 Hz`, and one audio channel.
 
 ## Must Read Files for Continuation
 

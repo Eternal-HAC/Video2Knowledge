@@ -47,9 +47,9 @@ example URL
 -> local Markdown file
 ```
 
-## Stage 2 Interface Groundwork
+## Interface Groundwork
 
-The current code defines the first replaceable boundaries without calling real providers:
+The project started with replaceable boundaries and now has real YouTube metadata, official subtitle, and local ffmpeg normalization implementations alongside Mock defaults:
 
 ```text
 raw input
@@ -65,19 +65,20 @@ raw input
 - `platform_adapter` classifies URL and local file inputs and infers platform labels.
 - `platform_adapter` exposes platform capabilities for provider planning.
 - `pipeline` owns the import business flow so CLI stays thin.
-- `downloader` exposes a metadata boundary that is still backed by Mock data.
-- `transcript` records the future fallback order: official subtitles, transcript API, Whisper.
+- `downloader` exposes Mock metadata and real YouTube metadata-only extraction.
+- `transcript` provides Mock transcripts, official YouTube VTT/WebVTT subtitles, fallback eligibility policy, and Mock Whisper fallback orchestration.
+- `audio` provides Mock audio boundaries and a real ffmpeg normalizer for existing local files.
+- `whisper` currently provides only the deterministic Mock local backend.
 - The CLI remains compatible with `python -m app.cli import-url ...`.
 
-Non-Mock provider boundaries exist with narrow responsibilities:
+Implemented provider boundaries have narrow responsibilities:
 
 - Metadata provider: `yt-dlp` for YouTube metadata only.
 - Transcript provider: `official-subtitles` for YouTube official VTT/WebVTT subtitles only.
-- Transcript provider placeholder: `real-fallback` for future fallback chains.
+- Transcript strategy: `real-fallback` for official subtitles followed only by eligible Mock local fallback.
+- Audio normalizer: `ffmpeg_audio_normalizer` for existing local audio files, not wired into the default fallback chain.
 
-Transcript fallback is intentionally not split into `OfficialSubtitleProvider`,
-`TranscriptApiProvider`, and `WhisperProvider` yet. That split belongs to the
-real subtitle stage, when provider-specific inputs and failure modes are known.
+Real audio acquisition, real Whisper/faster-whisper, Transcript API fallback, and LLM knowledge extraction are not implemented.
 
 ## Design Principles
 
@@ -111,16 +112,17 @@ YouTube URL
 
 This stage does not download media, fetch subtitles, run Whisper, call LLMs, or export to external systems. `raw_metadata` stores the sanitized provider payload for debugging and future mapping, but it is not rendered into Markdown frontmatter or body content.
 
-## Future Real Providers
+## Provider Direction
 
-- `yt-dlp` for video metadata.
-- Future media download remains out of scope for `v0.3.x`.
-- `ffmpeg` for media processing.
+- `yt-dlp` is implemented for YouTube metadata-only extraction.
+- Official YouTube VTT/WebVTT acquisition is implemented.
+- `ffmpeg` normalization is implemented for existing local audio files.
+- Future explicitly permitted audio acquisition remains separate from the current default pipeline.
 - `youtube-transcript-api` for transcript fallback.
 - `faster-whisper` for local transcription.
 - OpenAI-compatible, Anthropic, or Gemini APIs for LLM summarization.
 
-Transcript, Whisper, and LLM providers remain out of scope for `v0.3.x`.
+Transcript API fallback, real Whisper, and LLM providers remain unimplemented.
 
 ## v0.4.x Official Transcript
 
@@ -188,6 +190,25 @@ local audio file
 ```
 
 This boundary is not wired into `real-fallback` by default. The fallback path still uses `MockAudioNormalizer`. The ffmpeg boundary does not download audio, run Whisper, access YouTube, use Transcript API fallback, or call LLMs. A separate user-confirmed local smoke test verified 16 kHz mono PCM WAV output.
+
+## Current v0.5.x State
+
+Completed:
+
+- Fallback eligibility and error taxonomy.
+- Mock Whisper fallback orchestration.
+- Mock audio acquisition and normalization boundaries.
+- Runtime cache and media artifact safety policy.
+- Real ffmpeg normalizer boundary for existing local audio.
+- Local ffmpeg and ffprobe smoke test.
+
+Not implemented:
+
+- Real audio acquisition.
+- Selection of real ffmpeg normalization in `real-fallback`.
+- Real Whisper or faster-whisper execution.
+- Transcript API fallback.
+- LLM knowledge extraction.
 
 ## URL Intake Boundaries
 
