@@ -83,10 +83,12 @@ class FasterWhisperBackend:
 
         try:
             from faster_whisper import WhisperModel
-        except ImportError as error:
+        except ImportError:
             raise LocalTranscriptionError(
                 "faster-whisper is not installed"
-            ) from error
+            ) from None
+        except Exception:
+            raise LocalTranscriptionError("local transcription failed") from None
 
         try:
             model = WhisperModel(
@@ -107,8 +109,8 @@ class FasterWhisperBackend:
                 for segment in raw_segments
                 if (text := str(segment.text).strip())
             ]
-        except Exception as error:
-            raise LocalTranscriptionError("local transcription failed") from error
+        except Exception:
+            raise LocalTranscriptionError("local transcription failed") from None
 
         if not segments:
             raise LocalTranscriptionError("local transcription produced no segments")

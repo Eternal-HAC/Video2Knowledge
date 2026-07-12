@@ -350,3 +350,25 @@ Remaining boundaries:
 - The current transcript result contract cannot represent detected language.
 - Retained cache and live audio acquisition remain incomplete.
 - Push of the existing local commit range is temporarily deferred by the current HTTPS/TLS environment; this is not a Video2Knowledge product defect.
+
+## 2026-07-12
+
+Status: `FasterWhisperBackend` exception sanitization fix complete.
+
+Changes:
+
+- Map non-`ImportError` dependency initialization failures to the stable `local transcription failed` error.
+- Suppress underlying exception chains for dependency import, model construction, transcription, lazy iteration, segment access, and timestamp conversion failures.
+- Preserve `KeyboardInterrupt`, `SystemExit`, and other control-flow exceptions outside the `Exception` hierarchy.
+- Add mocked traceback sanitization, input gate, control-flow, and timestamp boundary coverage without installing or importing real faster-whisper.
+
+Validation:
+
+- Targeted Whisper tests passed: 25 tests.
+- Full unit tests passed: 95 tests.
+- Mock CLI regression passed with the existing Mock providers.
+
+Remaining boundaries:
+
+- Empty or fully filtered segment output remains `local transcription produced no segments`; a future approved live smoke test or fallback integration stage must validate the product semantics for pure-silence audio.
+- faster-whisper installation, model acquisition, live transcription, pipeline integration, and `real-fallback` integration remain incomplete.

@@ -120,3 +120,10 @@
 - Added input-first validation, lazy dependency loading, stable sanitized local transcription errors, timestamp formatting, and empty-result handling.
 - Added mocked tests for dependency absence, model configuration, path forwarding, segment mapping, failure sanitization, input preservation, and Mock backend regression.
 - Kept dependency installation, model download, live ASR, pipeline integration, fallback integration, retained cache, and live audio acquisition out of this stage.
+
+## 2026-07-12
+
+- Sanitized `FasterWhisperBackend` dependency initialization and runtime failures without exposing underlying exception chains in default tracebacks.
+- Preserved the distinct missing-dependency error and propagation of control-flow exceptions.
+- Added mocked coverage for immediate and lazy failures, segment access, timestamp conversion and boundaries, input gates, and traceback redaction.
+- Kept empty or filtered output mapped to `local transcription produced no segments`; pure-silence semantics remain for a future approved live validation or fallback integration stage.

@@ -39,12 +39,16 @@ Current development milestone: `v0.5.x Whisper Fallback`
 - Runtime cache and media artifact safety policy.
 - `FfmpegAudioNormalizer` for existing local audio files.
 - Verified local ffmpeg smoke test producing 16 kHz mono PCM WAV.
+- `FasterWhisperBackend` boundary for existing normalized audio, with lazy
+  optional dependency loading and sanitized runtime errors.
 
 ## Not Implemented
 
 - Real audio acquisition or media download for fallback.
 - ffmpeg integration into the default `real-fallback` chain.
-- Real Whisper or faster-whisper transcription.
+- faster-whisper installation, model download, and validated live local
+  transcription. The backend boundary is implemented but is not connected to
+  the pipeline or `real-fallback`.
 - Automatic captions.
 - Transcript API fallback.
 - LLM knowledge extraction.
@@ -128,7 +132,7 @@ Audio acquisition, media download, and retained audio cache require explicit use
 python -m unittest discover -s tests
 ```
 
-Current test baseline: `52` tests.
+Current test baseline: `95` tests.
 
 ## Markdown Output
 
