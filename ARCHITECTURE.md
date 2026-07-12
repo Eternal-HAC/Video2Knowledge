@@ -79,9 +79,10 @@ Implemented provider boundaries have narrow responsibilities:
 - Transcript strategy: `real-fallback` for official subtitles followed only by eligible Mock local fallback.
 - Audio normalizer: `ffmpeg_audio_normalizer` for existing local audio files, not wired into the default fallback chain.
 
-Real audio acquisition and real faster-whisper execution are not validated or
-connected to the pipeline. Transcript API fallback and LLM knowledge extraction
-are not implemented.
+Real audio acquisition is not validated. A standalone faster-whisper CPU smoke
+test has passed, but the backend remains disconnected from the pipeline and
+`real-fallback`. Transcript API fallback and LLM knowledge extraction are not
+implemented.
 
 ## Design Principles
 
@@ -125,7 +126,9 @@ This stage does not download media, fetch subtitles, run Whisper, call LLMs, or 
 - `faster-whisper` for local transcription.
 - OpenAI-compatible, Anthropic, or Gemini APIs for LLM summarization.
 
-Transcript API fallback, real Whisper, and LLM providers remain unimplemented.
+Transcript API fallback and LLM providers remain unimplemented. The real
+faster-whisper backend is implemented and standalone CPU execution is
+validated, but runtime orchestration remains unimplemented.
 
 ## v0.4.x Official Transcript
 
@@ -299,13 +302,16 @@ Completed:
 - AudioWorkspace lifecycle boundary for registered temporary artifacts.
 - `FasterWhisperBackend` boundary with lazy optional dependency loading,
   sanitized errors, and mocked segment mapping tests.
+- Standalone faster-whisper CPU smoke test using the pinned `asr` dependency
+  combination and an existing normalized WAV input.
 
 Not implemented:
 
 - A user-confirmed live audio acquisition test.
 - Retained audio cache.
 - Selection of real ffmpeg normalization in `real-fallback`.
-- Installation, model download, and live execution of faster-whisper.
+- Pipeline and `real-fallback` integration of the validated faster-whisper
+  backend.
 - Transcript API fallback.
 - LLM knowledge extraction.
 
@@ -336,10 +342,27 @@ audio acquisition or normalizer ids. The current `TranscriptResult` contract
 has no language field, so the configured language is passed to faster-whisper
 but detected language cannot yet be represented in the returned result.
 
-This stage uses mocked unit tests only. faster-whisper is not installed by this
-stage, no model is downloaded, live transcription is not validated, and the
-backend is not selected by the pipeline or `real-fallback`. Retained cache and
-live audio acquisition also remain incomplete.
+The boundary stage used mocked unit tests only. A subsequent standalone CPU
+smoke test validated `faster-whisper 1.2.1`, `ctranslate2 4.8.1`, and `av 18.0.0`
+on Windows with Python 3.13.7, the `Systran/faster-whisper-small` model,
+`device="cpu"`, `compute_type="int8"`, and `language=None`. It transcribed an
+existing 5.482688-second 16 kHz mono PCM WAV into one non-empty segment from
+`00:00:00.000` to `00:00:05.000`, with provider and attempted providers both
+correctly set to `faster_whisper`.
+
+The 39.169-second first end-to-end measurement included model acquisition,
+loading, and transcription and is not a stable performance benchmark. The
+model cache was approximately 463.70 MiB; Windows symlink degradation did not
+prevent execution but may increase disk use. The experimental cache location
+is not a product cache policy. The test did not use GPU, CUDA, VAD, batch mode,
+pipeline orchestration, or accuracy evaluation. Input audio content and the
+tracked worktree remained unchanged.
+
+The `asr` packaging extra pins the validated faster-whisper version but does
+not package model files. Model acquisition remains a separate first-use or
+explicit preparation action. The backend is still not selected by the pipeline
+or `real-fallback`; retained cache and live YouTube audio acquisition also
+remain incomplete.
 
 ## URL Intake Boundaries
 

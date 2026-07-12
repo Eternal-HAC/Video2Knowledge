@@ -46,9 +46,10 @@ Current development milestone: `v0.5.x Whisper Fallback`
 
 - Real audio acquisition or media download for fallback.
 - ffmpeg integration into the default `real-fallback` chain.
-- faster-whisper installation, model download, and validated live local
-  transcription. The backend boundary is implemented but is not connected to
-  the pipeline or `real-fallback`.
+- faster-whisper integration into the pipeline or `real-fallback`. The backend
+  boundary, optional dependency combination, small model, and standalone CPU
+  transcription have been validated, but no supported end-to-end CLI path uses
+  them yet.
 - Automatic captions.
 - Transcript API fallback.
 - LLM knowledge extraction.
@@ -133,6 +134,30 @@ python -m unittest discover -s tests
 ```
 
 Current test baseline: `95` tests.
+
+## Installation
+
+Install the base project without local ASR dependencies:
+
+```powershell
+python -m pip install -e .
+```
+
+Install the optional local ASR dependency set:
+
+```powershell
+python -m pip install -e ".[asr]"
+```
+
+The `asr` extra installs the validated faster-whisper Python dependency. It
+does not add model files or model caches to the repository. The first run with
+a model name may access Hugging Face Hub and cache model files separately;
+cache location and lifecycle remain environment or future configuration
+concerns rather than a current product policy.
+
+`FasterWhisperBackend` is currently available only as a code boundary. The CLI
+and `real-fallback` do not select it yet, so these installation commands do not
+enable an end-to-end real ASR CLI path.
 
 ## Markdown Output
 

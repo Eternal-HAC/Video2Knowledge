@@ -127,3 +127,10 @@
 - Preserved the distinct missing-dependency error and propagation of control-flow exceptions.
 - Added mocked coverage for immediate and lazy failures, segment access, timestamp conversion and boundaries, input gates, and traceback redaction.
 - Kept empty or filtered output mapped to `local transcription produced no segments`; pure-silence semantics remain for a future approved live validation or fallback integration stage.
+
+## 2026-07-12
+
+- Validated a standalone faster-whisper CPU smoke test on Windows with Python 3.13.7, faster-whisper 1.2.1, the small model, and CPU `int8` execution.
+- Confirmed one non-empty `TranscriptResult` segment with stable provider ids while preserving the input audio and tracked worktree.
+- Added the optional `asr` packaging extra pinned to `faster-whisper==1.2.1`; base installation remains free of the local ASR dependency set.
+- Documented that model files are acquired and cached separately, the first-run timing is not a stable benchmark, and pipeline, `real-fallback`, live audio acquisition, and retained cache remain incomplete.

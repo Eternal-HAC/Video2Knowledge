@@ -372,3 +372,45 @@ Remaining boundaries:
 
 - Empty or fully filtered segment output remains `local transcription produced no segments`; a future approved live smoke test or fallback integration stage must validate the product semantics for pure-silence audio.
 - faster-whisper installation, model acquisition, live transcription, pipeline integration, and `real-fallback` integration remain incomplete.
+
+## 2026-07-12
+
+Status: `v0.5.3b Faster-Whisper CPU Smoke Test` passed and `v0.5.3c` optional dependency adoption complete.
+
+Validated environment:
+
+- Windows with Python 3.13.7.
+- `faster-whisper 1.2.1`, `ctranslate2 4.8.1`, `av 18.0.0`, and `huggingface-hub 1.23.0`.
+- `Systran/faster-whisper-small`, CPU, `int8`, and `language=None`.
+- Existing 5.482688-second 16 kHz mono PCM WAV input.
+
+Result:
+
+- Backend end-to-end time was 39.169 seconds and included first model acquisition, loading, and transcription; it is not a stable benchmark.
+- Returned one non-empty segment from `00:00:00.000` to `00:00:05.000`.
+- Provider and attempted providers were both `faster_whisper`.
+- Input audio hash and tracked Git worktree were unchanged.
+- No GPU, CUDA, VAD, batch mode, pipeline integration, or accuracy evaluation was used.
+- Model cache was approximately 463.70 MiB. Windows symlink degradation did not block execution but may increase disk use.
+
+Packaging:
+
+- Added the optional `asr` extra with `faster-whisper==1.2.1`.
+- Base installation still installs only the existing core dependencies.
+- Model files are not packaged; acquisition and caching remain separate first-use or preparation behavior.
+- The smoke-test cache location remains experimental and is not a formal product cache policy.
+
+Validation:
+
+- Full unit tests passed: 95 tests on the project-standard Python 3.13.7 interpreter.
+- Mock CLI regression passed with the existing Mock providers.
+- Editable `.[asr]` pip dry-run recognized `faster-whisper==1.2.1` and the already installed validated runtime without planning dependency uninstall or downgrade.
+
+Remaining boundaries:
+
+- `FasterWhisperBackend` is not connected to pipeline or `real-fallback`.
+- Formal local-file-to-real-ASR orchestration is not implemented.
+- Live YouTube audio acquisition and retained audio cache remain incomplete.
+- `TranscriptResult` has no detected-language field.
+- Pure-silence semantics and exact half-millisecond timestamp rounding are not formal product contracts.
+- GPU/CUDA and formal model-cache location, lifecycle, and cleanup remain unvalidated or undesigned.

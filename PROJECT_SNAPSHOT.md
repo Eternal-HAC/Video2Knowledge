@@ -16,7 +16,7 @@ Video2Knowledge is a Local First video-to-knowledge pipeline that converts suppo
 
 ## Current Stage
 
-The latest tagged release is `v0.4.0 Official Transcript`. Development is currently in `v0.5.x Whisper Fallback`, with policy, Mock fallback, audio boundaries, cache safety, local ffmpeg normalization, workspace cleanup, and the mocked faster-whisper backend boundary validated.
+The latest tagged release is `v0.4.0 Official Transcript`. Development is currently in `v0.5.x Whisper Fallback`, with policy, Mock fallback, audio boundaries, cache safety, local ffmpeg normalization, workspace cleanup, the faster-whisper backend boundary, and a standalone CPU smoke test validated.
 
 ## Completed
 
@@ -39,6 +39,8 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - YouTube-only `YtDlpAudioProvider` boundary with explicit permission, audio-only yt-dlp Python API options, and mocked backend tests.
 - AudioWorkspace cleanup boundary for registered temporary audio artifacts.
 - FasterWhisperBackend boundary for existing normalized audio with lazy optional dependency loading, sanitized errors, and mocked segment mapping tests.
+- Standalone faster-whisper CPU smoke test on Windows and Python 3.13.7 using the small model, CPU `int8`, and an existing normalized WAV.
+- Optional `asr` dependency set pinned to the validated `faster-whisper==1.2.1` runtime.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -51,7 +53,7 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - User-confirmed live audio acquisition.
 - Retained-cache behavior.
 - ffmpeg integration into the default fallback path.
-- faster-whisper installation, model acquisition, and live transcription validation.
+- Pipeline and `real-fallback` integration of the validated faster-whisper backend.
 - LLM providers.
 - Obsidian automation.
 - Notion export.
@@ -77,12 +79,13 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - `YtDlpAudioProvider` is YouTube-only, defaults to disabled, produces temporary audio artifacts, and is not connected to `real-fallback`.
 - AudioWorkspace removes only registered temporary files in its private directory; it does not delete local user files or unknown workspace content.
 - `FasterWhisperBackend` validates local normalized audio before importing its optional dependency, does not expose local paths or raw runtime failures, and is not connected to `real-fallback`.
+- Base installation does not include faster-whisper. The optional `asr` extra installs the pinned Python dependency but not model files; model cache policy remains separate and unresolved.
 
 ## Next Steps
 
 1. Add separately approved audio cache retention.
 2. Keep the existing default `real-fallback` Mock-only until a separate integration stage is approved.
-3. Install and validate faster-whisper only after separate dependency, model, and live-test approval; keep it disconnected from fallback until a separate integration stage.
+3. Keep the validated faster-whisper backend disconnected from fallback until a separate integration stage defines orchestration and remaining transcript semantics.
 4. Keep Transcript API fallback, LLM extraction, and export expansion in separate stages.
 
 ## Live Validation Notes
@@ -95,6 +98,7 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - Output was Markdown only; no video, audio, subtitle, thumbnail, or other media artifacts were found.
 - Local ffmpeg validation used an existing user-approved audio file and produced an ignored runtime WAV artifact under `output/cache/audio/`.
 - `ffprobe` confirmed `pcm_s16le`, `16000 Hz`, and one audio channel.
+- A standalone faster-whisper CPU smoke test returned one non-empty segment for an existing 5.482688-second normalized WAV. The first 39.169-second end-to-end run included model acquisition and loading and is not a stable benchmark.
 
 ## Must Read Files for Continuation
 

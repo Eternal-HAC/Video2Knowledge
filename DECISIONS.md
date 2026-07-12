@@ -492,3 +492,20 @@ Backend construction has no file, model, network, or import side effects. Transc
 
 Follow-up Review:
 Review the transcript language contract before or during real fallback integration, and require separate approval for dependency installation, model acquisition, and live transcription validation.
+
+## 2026-07-12
+
+Decision:
+Expose local ASR dependencies through an optional `asr` extra and pin `faster-whisper==1.2.1` at the current stage.
+
+Reason:
+Official subtitle and base Mock workflows do not need the heavier local ASR runtime or model resources. Version 1.2.1 is the only faster-whisper version currently validated end to end on Windows with Python 3.13.7, CTranslate2 4.8.1, PyAV 18.0.0, and the real small model. The project is still early enough that reproducibility is more valuable than an unvalidated broad version range.
+
+Alternatives:
+Add faster-whisper to base dependencies, use an unpinned or ranged ASR dependency, or package model files and cache policy with the Python dependency.
+
+Impact:
+Base installation remains lightweight, while `.[asr]` installs the validated Python runtime combination. Model files remain separate first-use or explicit preparation artifacts and are not part of repository packaging. A broader version range requires a later compatibility validation stage.
+
+Follow-up Review:
+Re-evaluate the exact pin after newer faster-whisper versions are tested, and design formal model acquisition and cache lifecycle separately from dependency packaging.

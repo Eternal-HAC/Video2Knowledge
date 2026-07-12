@@ -32,8 +32,9 @@
 - [ ] Add separately approved audio cache retention.
 - [ ] Run a separately confirmed live audio acquisition smoke test.
 - [x] Add mocked faster-whisper backend boundary.
-- [ ] Install faster-whisper and download or select a model after explicit approval.
-- [ ] Run a separately confirmed live faster-whisper transcription test.
+- [x] Install faster-whisper and obtain the small model after explicit approval.
+- [x] Run a separately confirmed standalone faster-whisper CPU transcription test.
+- [x] Declare faster-whisper as the optional `asr` dependency set.
 - [ ] Add transcript API fallback.
 - [ ] Add local Whisper fallback.
 - [ ] Add configurable LLM summarizer.

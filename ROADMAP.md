@@ -59,7 +59,8 @@ Status: Completed at `v0.3.0`.
 - [ ] Run a separately confirmed live audio acquisition smoke test.
 - [ ] Wire real ffmpeg normalization into an explicitly selected fallback path.
 - [x] Add the mocked `FasterWhisperBackend` boundary behind the stable audio and transcript contracts.
-- [ ] Install faster-whisper, obtain a model, and validate real local transcription after separate approval.
+- [x] Install faster-whisper, obtain the small model, and validate standalone CPU local transcription after separate approval.
+- [x] Declare the validated faster-whisper runtime as the optional `asr` dependency set.
 - [ ] Wire real local transcription into an explicitly selected fallback path.
 - Keep local transcription separate from metadata and LLM work.
 - Require explicit future confirmation before audio acquisition or dependency installation.

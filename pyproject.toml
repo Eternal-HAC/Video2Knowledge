@@ -12,6 +12,11 @@ dependencies = [
     "yt-dlp>=2025.1.0",
 ]
 
+[project.optional-dependencies]
+asr = [
+    "faster-whisper==1.2.1",
+]
+
 [project.scripts]
 video2knowledge = "app.cli:main"
 
