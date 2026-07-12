@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import subprocess
 import tempfile
@@ -88,6 +89,116 @@ class LocalAsrOrchestrationTests(unittest.TestCase):
         factory.assert_not_called()
         backend.transcribe.assert_not_called()
 
+    def test_non_local_metadata_fails_before_provider_or_workspace(self) -> None:
+        metadata = get_mock_metadata(
+            "https://example.com/watch?v=private-token",
+            platform="youtube",
+        )
+        provider = mock.Mock()
+        factory = mock.Mock()
+        backend = mock.Mock()
+
+        with mock.patch("app.pipeline.AudioWorkspace") as workspace:
+            with self.assertRaises(AudioAcquisitionError) as context:
+                transcribe_local_media(
+                    metadata,
+                    whisper_backend=backend,
+                    audio_provider=provider,
+                    normalizer_factory=factory,
+                )
+
+        self.assertEqual(str(context.exception), "local audio input required")
+        self.assertNotIn(metadata.source_url, str(context.exception))
+        provider.acquire.assert_not_called()
+        workspace.assert_not_called()
+        factory.assert_not_called()
+        backend.transcribe.assert_not_called()
+
+    def test_temporary_provider_artifact_is_rejected_without_deletion(self) -> None:
+        with _local_input() as (metadata, original_path):
+            temporary_path = original_path.parent / "downloaded-temporary.m4a"
+            temporary_path.write_bytes(b"temporary provider output")
+            provider = mock.Mock()
+            provider.acquire.return_value = AudioArtifact(
+                path=temporary_path,
+                provider="yt_dlp_audio",
+                format="m4a",
+                temporary=True,
+            )
+            factory = mock.Mock()
+            backend = mock.Mock()
+
+            with mock.patch("app.pipeline.AudioWorkspace") as workspace:
+                with self.assertRaises(AudioAcquisitionError) as context:
+                    transcribe_local_media(
+                        metadata,
+                        whisper_backend=backend,
+                        audio_provider=provider,
+                        normalizer_factory=factory,
+                    )
+
+            self.assertEqual(
+                str(context.exception),
+                "local audio input must be user-owned",
+            )
+            self.assertTrue(temporary_path.exists())
+            self.assertEqual(
+                temporary_path.read_bytes(),
+                b"temporary provider output",
+            )
+            workspace.assert_not_called()
+            factory.assert_not_called()
+            backend.transcribe.assert_not_called()
+
+    def test_provider_directory_and_missing_artifacts_are_rejected(self) -> None:
+        with _local_input() as (metadata, original_path):
+            cases = [
+                (original_path.parent, "local audio input must be a file"),
+                (
+                    original_path.parent / "missing-provider-output.wav",
+                    "local audio input file not found",
+                ),
+            ]
+            for path, expected in cases:
+                with self.subTest(path=path.name):
+                    provider = mock.Mock()
+                    provider.acquire.return_value = _audio_artifact(path)
+                    factory = mock.Mock()
+                    backend = mock.Mock()
+                    with mock.patch("app.pipeline.AudioWorkspace") as workspace:
+                        with self.assertRaises(AudioAcquisitionError) as context:
+                            transcribe_local_media(
+                                metadata,
+                                whisper_backend=backend,
+                                audio_provider=provider,
+                                normalizer_factory=factory,
+                            )
+
+                    self.assertEqual(str(context.exception), expected)
+                    workspace.assert_not_called()
+                    factory.assert_not_called()
+                    backend.transcribe.assert_not_called()
+
+    def test_provider_symlink_semantics_are_rejected_before_workspace(self) -> None:
+        with _local_input() as (metadata, original_path):
+            provider = mock.Mock()
+            provider.acquire.return_value = _audio_artifact(original_path)
+            with mock.patch.object(Path, "is_symlink", return_value=True):
+                with mock.patch("app.pipeline.AudioWorkspace") as workspace:
+                    with self.assertRaises(AudioAcquisitionError) as context:
+                        transcribe_local_media(
+                            metadata,
+                            whisper_backend=mock.Mock(),
+                            audio_provider=provider,
+                            normalizer_factory=mock.Mock(),
+                        )
+
+            self.assertEqual(
+                str(context.exception),
+                "local audio input must be a file",
+            )
+            workspace.assert_not_called()
+
     def test_normalizer_failure_stops_before_whisper(self) -> None:
         with _local_input() as (metadata, original_path):
             provider = _Provider(original_path, [])
@@ -145,7 +256,102 @@ class LocalAsrOrchestrationTests(unittest.TestCase):
                     )
 
             backend.transcribe.assert_not_called()
+            self.assertFalse(state["normalized_path"].exists())
+            self.assertFalse(state["workspace_path"].exists())
+
+    def test_registration_rejection_cleans_exact_inside_outputs(self) -> None:
+        for case in ("non_temporary", "directory", "missing"):
+            with self.subTest(case=case):
+                state: dict[str, object] = {}
+                with _local_input() as (metadata, original_path):
+                    backend = mock.Mock()
+                    with self.assertRaises(AudioProcessingError):
+                        transcribe_local_media(
+                            metadata,
+                            whisper_backend=backend,
+                            audio_provider=_Provider(original_path, []),
+                            normalizer_factory=_invalid_normalizer_factory(case, state),
+                        )
+
+                    backend.transcribe.assert_not_called()
+                    self.assertFalse(state["invalid_path"].exists())
+                    self.assertFalse(state["workspace_path"].exists())
+
+    def test_registration_rejection_preserves_workspace_external_output(self) -> None:
+        state: dict[str, object] = {}
+        with _local_input() as (metadata, original_path):
+            backend = mock.Mock()
+            with self.assertRaises(AudioProcessingError):
+                transcribe_local_media(
+                    metadata,
+                    whisper_backend=backend,
+                    audio_provider=_Provider(original_path, []),
+                    normalizer_factory=_invalid_normalizer_factory("outside", state),
+                )
+
+            self.assertTrue(state["invalid_path"].exists())
+            self.assertEqual(state["invalid_path"].read_bytes(), b"outside")
+            self.assertFalse(state["workspace_path"].exists())
+            backend.transcribe.assert_not_called()
+            state["invalid_path"].unlink()
+
+    def test_non_empty_directory_is_not_recursively_deleted(self) -> None:
+        state: dict[str, object] = {}
+        with _local_input() as (metadata, original_path):
+            backend = mock.Mock()
+            with self.assertRaises(AudioProcessingError) as context:
+                transcribe_local_media(
+                    metadata,
+                    whisper_backend=backend,
+                    audio_provider=_Provider(original_path, []),
+                    normalizer_factory=_invalid_normalizer_factory(
+                        "non_empty_directory",
+                        state,
+                    ),
+                )
+
+            self.assertEqual(
+                str(context.exception),
+                "audio workspace artifact must be a file",
+            )
+            self.assertTrue(state["invalid_path"].is_dir())
+            self.assertTrue(state["unknown_path"].exists())
+            self.assertTrue(state["workspace_path"].exists())
+            backend.transcribe.assert_not_called()
             _cleanup_test_workspace(state)
+
+    def test_symlink_escape_is_rejected_without_deleting_external_target(self) -> None:
+        state: dict[str, object] = {}
+        with _local_input() as (metadata, original_path):
+            external_target = original_path.parent / "external-target.wav"
+            external_target.write_bytes(b"external target")
+
+            def factory(workspace_path: Path):
+                state["workspace_path"] = workspace_path
+                link_path = workspace_path / "normalized-link.wav"
+                try:
+                    link_path.symlink_to(external_target)
+                except OSError as error:
+                    self.skipTest(f"symlink creation unavailable: {error}")
+                state["invalid_path"] = link_path
+                return mock.Mock(
+                    normalize=mock.Mock(return_value=_normalized_audio(link_path))
+                )
+
+            with self.assertRaises(AudioProcessingError):
+                transcribe_local_media(
+                    metadata,
+                    whisper_backend=mock.Mock(),
+                    audio_provider=_Provider(original_path, []),
+                    normalizer_factory=factory,
+                )
+
+            self.assertTrue(external_target.exists())
+            self.assertEqual(external_target.read_bytes(), b"external target")
+            self.assertTrue(state["invalid_path"].is_symlink())
+            self.assertTrue(state["workspace_path"].exists())
+            state["invalid_path"].unlink()
+            state["workspace_path"].rmdir()
 
     def test_cleanup_failure_without_business_error_is_reported(self) -> None:
         state: dict[str, object] = {"create_unknown": True}
@@ -177,6 +383,102 @@ class LocalAsrOrchestrationTests(unittest.TestCase):
         self.assertIs(context.exception, error)
         _cleanup_test_workspace(state)
 
+    def test_user_file_hash_is_preserved_across_outcome_matrix(self) -> None:
+        scenarios = (
+            "success",
+            "normalizer_failure",
+            "registration_failure",
+            "whisper_failure",
+            "keyboard_interrupt",
+            "system_exit",
+            "cleanup_failure",
+            "business_and_cleanup_failure",
+        )
+        for scenario in scenarios:
+            with self.subTest(scenario=scenario):
+                state: dict[str, object] = {}
+                if scenario in ("cleanup_failure", "business_and_cleanup_failure"):
+                    state["create_unknown"] = True
+
+                with _local_input() as (metadata, original_path):
+                    original_hash = _hash_file(original_path)
+                    provider = _Provider(original_path, [])
+                    backend_error: BaseException | None = None
+                    if scenario in ("whisper_failure", "business_and_cleanup_failure"):
+                        backend_error = LocalTranscriptionError(
+                            "local transcription failed"
+                        )
+                    elif scenario == "keyboard_interrupt":
+                        backend_error = KeyboardInterrupt()
+                    elif scenario == "system_exit":
+                        backend_error = SystemExit(7)
+
+                    backend = _Backend(
+                        _transcript_result(),
+                        [],
+                        state,
+                        error=backend_error,
+                    )
+                    factory = _normalizer_factory([], state)
+
+                    if scenario == "normalizer_failure":
+                        normalizer = mock.Mock()
+                        normalizer.normalize.side_effect = AudioProcessingError(
+                            "ffmpeg audio normalization failed"
+                        )
+                        factory = lambda _: normalizer
+
+                    expected_error: type[BaseException] | None = None
+                    if scenario in (
+                        "normalizer_failure",
+                        "registration_failure",
+                        "cleanup_failure",
+                    ):
+                        expected_error = AudioProcessingError
+                    elif scenario in (
+                        "whisper_failure",
+                        "business_and_cleanup_failure",
+                    ):
+                        expected_error = LocalTranscriptionError
+                    elif scenario == "keyboard_interrupt":
+                        expected_error = KeyboardInterrupt
+                    elif scenario == "system_exit":
+                        expected_error = SystemExit
+
+                    registration_patch = (
+                        mock.patch.object(
+                            AudioWorkspace,
+                            "register",
+                            side_effect=AudioProcessingError("registration failed"),
+                        )
+                        if scenario == "registration_failure"
+                        else contextlib.nullcontext()
+                    )
+
+                    with registration_patch:
+                        if expected_error is None:
+                            transcribe_local_media(
+                                metadata,
+                                whisper_backend=backend,
+                                audio_provider=provider,
+                                normalizer_factory=factory,
+                            )
+                        else:
+                            with self.assertRaises(expected_error):
+                                transcribe_local_media(
+                                    metadata,
+                                    whisper_backend=backend,
+                                    audio_provider=provider,
+                                    normalizer_factory=factory,
+                                )
+
+                    _assert_user_file_unchanged(
+                        self,
+                        original_path,
+                        original_hash,
+                    )
+                    _cleanup_test_workspace(state)
+
     def test_control_flow_exceptions_propagate_after_cleanup(self) -> None:
         for error in (KeyboardInterrupt(), SystemExit(7)):
             with self.subTest(error=type(error).__name__):
@@ -196,23 +498,42 @@ class LocalAsrOrchestrationTests(unittest.TestCase):
                     self.assertFalse(state["workspace_path"].exists())
                     self.assertTrue(original_path.exists())
 
-    def test_untrusted_normalizer_outputs_are_rejected(self) -> None:
-        cases = ("outside", "non_temporary", "directory", "missing")
-        for case in cases:
-            with self.subTest(case=case):
+    def test_control_flow_exceptions_survive_cleanup_failure(self) -> None:
+        for error in (KeyboardInterrupt(), SystemExit(7)):
+            with self.subTest(error=type(error).__name__):
                 state: dict[str, object] = {}
                 with _local_input() as (metadata, original_path):
-                    backend = mock.Mock()
-                    with self.assertRaises(AudioProcessingError):
-                        transcribe_local_media(
-                            metadata,
-                            whisper_backend=backend,
-                            audio_provider=_Provider(original_path, []),
-                            normalizer_factory=_invalid_normalizer_factory(case, state),
-                        )
-                    backend.transcribe.assert_not_called()
-                    if case == "outside":
-                        self.assertTrue(state["invalid_path"].exists())
+                    original_hash = _hash_file(original_path)
+                    cleanup_error = AudioProcessingError(
+                        "audio workspace cleanup failed"
+                    )
+                    with mock.patch.object(
+                        AudioWorkspace,
+                        "cleanup",
+                        side_effect=cleanup_error,
+                    ) as cleanup:
+                        with self.assertRaises(type(error)) as context:
+                            transcribe_local_media(
+                                metadata,
+                                whisper_backend=_Backend(
+                                    _transcript_result(),
+                                    [],
+                                    state,
+                                    error=error,
+                                ),
+                                audio_provider=_Provider(original_path, []),
+                                normalizer_factory=_normalizer_factory([], state),
+                            )
+
+                    cleanup.assert_called_once_with()
+                    self.assertIs(context.exception, error)
+                    if isinstance(error, SystemExit):
+                        self.assertEqual(context.exception.code, 7)
+                    _assert_user_file_unchanged(
+                        self,
+                        original_path,
+                        original_hash,
+                    )
                     _cleanup_test_workspace(state)
 
     def test_default_normalizer_is_constructed_for_workspace_without_running_ffmpeg(self) -> None:
@@ -423,6 +744,13 @@ def _invalid_normalizer_factory(case: str, state: dict[str, object]):
             path = workspace_path / "directory"
             path.mkdir()
             artifact = _normalized_audio(path)
+        elif case == "non_empty_directory":
+            path = workspace_path / "directory"
+            path.mkdir()
+            unknown = path / "unknown.tmp"
+            unknown.write_bytes(b"unknown")
+            state["unknown_path"] = unknown
+            artifact = _normalized_audio(path)
         else:
             path = workspace_path / "missing.wav"
             artifact = _normalized_audio(path)
@@ -444,7 +772,7 @@ class _local_input:
 
 
 def _cleanup_test_workspace(state: dict[str, object]) -> None:
-    for key in ("invalid_path", "unknown_path", "normalized_path"):
+    for key in ("unknown_path", "invalid_path", "normalized_path"):
         path = state.get(key)
         if isinstance(path, Path) and path.exists():
             if path.is_dir():
@@ -486,6 +814,17 @@ def _transcript_result() -> TranscriptResult:
 
 def _hash_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _assert_user_file_unchanged(
+    test_case: unittest.TestCase,
+    path: Path,
+    expected_hash: str,
+) -> None:
+    test_case.assertTrue(path.exists())
+    test_case.assertTrue(path.is_file())
+    test_case.assertEqual(path.read_bytes(), b"user-owned")
+    test_case.assertEqual(_hash_file(path), expected_hash)
 
 
 if __name__ == "__main__":

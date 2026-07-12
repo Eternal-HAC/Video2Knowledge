@@ -440,3 +440,27 @@ Remaining boundaries:
 - A complete real local-file-to-ASR integration smoke test has not run.
 - YouTube live audio acquisition, retained audio cache, and formal model-cache management remain incomplete.
 - Detected-language, pure-silence, and exact timestamp-rounding contracts remain unchanged and unresolved.
+
+## 2026-07-12
+
+Status: Local-file ASR ownership boundary fix complete.
+
+Changes:
+
+- Enforce local metadata before provider or workspace creation.
+- Require provider output to be an existing regular user-owned `temporary=False` artifact.
+- Reject temporary and network-style acquisition artifacts before normalization.
+- Give orchestration limited provisional ownership of the exact normalized workspace output and clean only that object when registration fails.
+- Preserve external paths, symlink targets, non-empty directories, unknown files, registration errors, business errors, and control-flow exceptions according to the existing ownership boundary.
+
+Validation:
+
+- Local ASR orchestration tests passed: 25 tests, with one filesystem symlink-escape test skipped because symlink creation is unavailable in the current Windows environment; deterministic source-symlink rejection and workspace-external escape tests passed.
+- Mocked ffmpeg tests passed: 9 tests.
+- Full unit tests passed: 120 tests, with the same one filesystem symlink-escape test skipped.
+- No real ffmpeg, faster-whisper, model, media download, or network operation was used.
+
+Remaining boundaries:
+
+- The orchestration remains absent from CLI and `real-fallback`.
+- A separately approved real local-file-to-ASR integration smoke test remains pending.

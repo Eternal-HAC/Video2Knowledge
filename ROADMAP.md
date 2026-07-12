@@ -61,7 +61,7 @@ Status: Completed at `v0.3.0`.
 - [x] Add the mocked `FasterWhisperBackend` boundary behind the stable audio and transcript contracts.
 - [x] Install faster-whisper, obtain the small model, and validate standalone CPU local transcription after separate approval.
 - [x] Declare the validated faster-whisper runtime as the optional `asr` dependency set.
-- [x] Add mocked local-file-to-ASR orchestration with private normalized-artifact cleanup.
+- [x] Add mocked local-file-to-ASR orchestration with strict local input ownership and private normalized-artifact cleanup.
 - [ ] Run a separately approved real local-file-to-ASR integration smoke test.
 - [ ] Wire real local transcription into an explicitly selected fallback path.
 - Keep local transcription separate from metadata and LLM work.

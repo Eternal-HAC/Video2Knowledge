@@ -398,6 +398,21 @@ return, transcription failure, or control-flow exit. Ffmpeg timeout, startup
 failure, and non-zero exit also make a best-effort non-recursive removal of
 only the newly calculated output path, without masking the processing error.
 
+The entry point accepts only `metadata.platform == "local"`. Its provider must
+return an existing regular user-owned `AudioArtifact(temporary=False)`;
+temporary acquisition providers, including `YtDlpAudioProvider`, are outside
+this orchestration boundary. After normalization returns, the orchestration has
+limited provisional ownership of only that exact returned workspace object.
+If registration fails, it best-effort removes only that exact in-workspace file
+or empty directory, never scans recursively, never follows a symlink to an
+external target, and never deletes workspace-external or unknown content. The
+original registration error remains primary if provisional cleanup also fails.
+
+An injected normalizer must write only into the supplied workspace, return the
+one `temporary=True` artifact created by the call, clean its own partial output
+before raising when possible, and avoid unknown side files. Orchestration cannot
+safely claim files that a failing normalizer did not return.
+
 This stage is validated only through mocked integration tests and placeholder
 temporary files. It is not exposed by the CLI, is not selected by the default
 pipeline or `real-fallback`, and has not received a full real local-file-to-ASR

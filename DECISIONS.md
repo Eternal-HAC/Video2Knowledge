@@ -479,6 +479,23 @@ Integrate the workspace with explicitly selected acquisition and normalization o
 ## 2026-07-12
 
 Decision:
+Limit `transcribe_local_media` to user-owned local source artifacts and give orchestration provisional ownership only of the exact normalized object returned inside its private workspace before registration.
+
+Reason:
+Temporary acquisition artifacts cannot safely outlive their acquisition owner, while a normalized object rejected during registration is not yet tracked by `AudioWorkspace`. Without an explicit boundary, local orchestration can leak downloaded source artifacts or unregistered workspace output.
+
+Alternatives:
+Allow arbitrary providers, recursively delete the workspace after registration failure, or leave every rejected normalized object for test or caller cleanup.
+
+Impact:
+The local entry point rejects non-local metadata and any source artifact that is temporary, missing, or not a regular file. On registration failure it best-effort cleans only the exact returned in-workspace file or empty directory. It does not scan, recurse, follow symlinks to external targets, remove unknown files, or claim output a normalizer created but did not return. Registration, business, and control-flow errors remain primary over cleanup failures.
+
+Follow-up Review:
+Validate the boundary with a separately approved real local-file-to-ASR integration smoke test before exposing it through CLI or `real-fallback`.
+
+## 2026-07-12
+
+Decision:
 Implement `FasterWhisperBackend` as a lazy optional boundary over existing `NormalizedAudio` without connecting it to the pipeline or `real-fallback`.
 
 Reason:

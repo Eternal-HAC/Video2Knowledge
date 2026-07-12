@@ -142,3 +142,11 @@
 - Added narrowly scoped best-effort cleanup for partial ffmpeg output after timeout, startup failure, or non-zero exit.
 - Added mocked integration and lifecycle coverage without running real ffmpeg, faster-whisper, user media, or network access.
 - Kept CLI, default pipeline, `real-fallback`, YouTube acquisition, retained cache, and model-cache management unchanged.
+
+## 2026-07-12
+
+- Enforced local metadata and user-owned non-temporary source artifacts at the non-CLI local ASR orchestration boundary.
+- Rejected temporary/network-style provider artifacts before workspace creation or normalization.
+- Added limited provisional ownership for the exact normalized workspace object returned before registration, with non-recursive best-effort cleanup on registration failure.
+- Preserved user inputs, external paths, symlink targets, unknown workspace content, business errors, and control-flow exceptions under cleanup failure.
+- Added mocked lifecycle and SHA-256 input-protection coverage without running real ffmpeg, faster-whisper, network, or model operations.

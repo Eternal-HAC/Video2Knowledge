@@ -41,6 +41,8 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - FasterWhisperBackend boundary for existing normalized audio with lazy optional dependency loading, sanitized errors, and mocked segment mapping tests.
 - Standalone faster-whisper CPU smoke test on Windows and Python 3.13.7 using the small model, CPU `int8`, and an existing normalized WAV.
 - Optional `asr` dependency set pinned to the validated `faster-whisper==1.2.1` runtime.
+- Mocked local-file ASR orchestration with strict local metadata, user-owned
+  source-artifact validation, private normalized-output ownership, and cleanup.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -80,12 +82,19 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - AudioWorkspace removes only registered temporary files in its private directory; it does not delete local user files or unknown workspace content.
 - `FasterWhisperBackend` validates local normalized audio before importing its optional dependency, does not expose local paths or raw runtime failures, and is not connected to `real-fallback`.
 - Base installation does not include faster-whisper. The optional `asr` extra installs the pinned Python dependency but not model files; model cache policy remains separate and unresolved.
+- `transcribe_local_media` accepts only local metadata and an existing regular
+  `temporary=False` user-owned source artifact; temporary or network acquisition
+  providers cannot enter this boundary.
+- Before workspace registration, orchestration owns only the exact normalized
+  object returned inside that workspace. Registration failure triggers only
+  non-recursive exact-object cleanup and never removes external, symlink-target,
+  user-owned, or unknown content.
 
 ## Next Steps
 
 1. Add separately approved audio cache retention.
 2. Keep the existing default `real-fallback` Mock-only until a separate integration stage is approved.
-3. Keep the validated faster-whisper backend disconnected from fallback until a separate integration stage defines orchestration and remaining transcript semantics.
+3. Keep local-file ASR orchestration disconnected from CLI and `real-fallback` until a separate integration stage and real smoke test are approved.
 4. Keep Transcript API fallback, LLM extraction, and export expansion in separate stages.
 
 ## Live Validation Notes

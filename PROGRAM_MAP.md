@@ -3,7 +3,7 @@
 ## Runtime Entry
 
 - `app/cli.py`: command-line entrypoint for the Mock import flow.
-- `app/pipeline.py`: business pipeline for source resolution, metadata, transcript, summary, Markdown rendering, and export. Also contains the non-CLI `transcribe_local_media` orchestration boundary for composing local-file audio, private normalization workspace, and an injected Whisper backend without changing the default import flow.
+- `app/pipeline.py`: business pipeline for source resolution, metadata, transcript, summary, Markdown rendering, and export. Also contains the non-CLI, local-only `transcribe_local_media` orchestration boundary. It requires a user-owned non-temporary source artifact, gives limited provisional ownership to the exact normalized workspace output before registration, and never connects temporary/network acquisition to the default import flow.
 
 ## Pipeline Modules
 
