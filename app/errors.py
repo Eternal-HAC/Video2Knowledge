@@ -41,3 +41,7 @@ class AudioProcessingError(RuntimeError):
 
 class FfmpegNotFoundError(AudioProcessingError):
     """Raised when ffmpeg is required but unavailable."""
+
+
+class LocalTranscriptionError(RuntimeError):
+    """Raised when a local ASR backend cannot produce a transcript."""

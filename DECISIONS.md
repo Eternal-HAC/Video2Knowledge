@@ -475,3 +475,20 @@ Impact:
 
 Follow-up Review:
 Integrate the workspace with explicitly selected acquisition and normalization only in a separate stage, then design separately approved cache retention.
+
+## 2026-07-12
+
+Decision:
+Implement `FasterWhisperBackend` as a lazy optional boundary over existing `NormalizedAudio` without connecting it to the pipeline or `real-fallback`.
+
+Reason:
+The project needs to validate input ordering, optional dependency loading, model arguments, segment mapping, and sanitized failures independently from dependency installation, model download, media acquisition, ffmpeg orchestration, and live ASR cost.
+
+Alternatives:
+Install and execute faster-whisper immediately, construct the model during backend initialization, or integrate the backend directly into `real-fallback` in the same stage.
+
+Impact:
+Backend construction has no file, model, network, or import side effects. Transcription validates the normalized audio file before importing faster-whisper, returns only the stable `faster_whisper` transcript provider id, and sanitizes model and iteration failures. The current result contract has no language field, so configured language is forwarded to faster-whisper while detected language remains outside the returned result.
+
+Follow-up Review:
+Review the transcript language contract before or during real fallback integration, and require separate approval for dependency installation, model acquisition, and live transcription validation.

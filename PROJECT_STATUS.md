@@ -323,3 +323,30 @@ Changes:
 Validation target:
 
 - Targeted provider tests and the full standard test suite pass without installing yt-dlp or accessing the network.
+
+## 2026-07-12
+
+Status: `v0.5.3a FasterWhisperBackend Boundary` implementation complete.
+
+Changes:
+
+- Added `FasterWhisperBackend` for existing `NormalizedAudio` inputs.
+- Validate the input file before lazily importing the optional faster-whisper dependency.
+- Map ordered faster-whisper segments into `TranscriptSegment` timestamps and text.
+- Keep model construction, transcription, and lazy segment iteration behind stable sanitized local transcription errors.
+- Preserve the Mock backend and keep the real backend disconnected from pipeline and `real-fallback` orchestration.
+
+Validation:
+
+- Mocked faster-whisper tests only; no dependency installation, model download, network access, ffmpeg, yt-dlp, or real ASR execution.
+- Targeted Whisper tests passed: 15 tests.
+- Full unit tests passed: 85 tests.
+- Mock CLI regression passed with the existing Mock providers.
+
+Remaining boundaries:
+
+- faster-whisper is not installed and no model has been downloaded.
+- Live local transcription is not validated.
+- The current transcript result contract cannot represent detected language.
+- Retained cache and live audio acquisition remain incomplete.
+- Push of the existing local commit range is temporarily deferred by the current HTTPS/TLS environment; this is not a Video2Knowledge product defect.

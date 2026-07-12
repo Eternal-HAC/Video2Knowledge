@@ -68,7 +68,8 @@ raw input
 - `downloader` exposes Mock metadata and real YouTube metadata-only extraction.
 - `transcript` provides Mock transcripts, official YouTube VTT/WebVTT subtitles, fallback eligibility policy, and Mock Whisper fallback orchestration.
 - `audio` provides Mock audio boundaries and a real ffmpeg normalizer for existing local files.
-- `whisper` currently provides only the deterministic Mock local backend.
+- `whisper` provides the deterministic Mock local backend and a lazy optional
+  `FasterWhisperBackend` boundary for existing normalized audio.
 - The CLI remains compatible with `python -m app.cli import-url ...`.
 
 Implemented provider boundaries have narrow responsibilities:
@@ -78,7 +79,9 @@ Implemented provider boundaries have narrow responsibilities:
 - Transcript strategy: `real-fallback` for official subtitles followed only by eligible Mock local fallback.
 - Audio normalizer: `ffmpeg_audio_normalizer` for existing local audio files, not wired into the default fallback chain.
 
-Real audio acquisition, real Whisper/faster-whisper, Transcript API fallback, and LLM knowledge extraction are not implemented.
+Real audio acquisition and real faster-whisper execution are not validated or
+connected to the pipeline. Transcript API fallback and LLM knowledge extraction
+are not implemented.
 
 ## Design Principles
 
@@ -294,15 +297,49 @@ Completed:
 - Local file audio provider boundary for user-owned files.
 - YouTube-only `yt_dlp_audio` provider boundary with mocked backend tests.
 - AudioWorkspace lifecycle boundary for registered temporary artifacts.
+- `FasterWhisperBackend` boundary with lazy optional dependency loading,
+  sanitized errors, and mocked segment mapping tests.
 
 Not implemented:
 
 - A user-confirmed live audio acquisition test.
 - Retained audio cache.
 - Selection of real ffmpeg normalization in `real-fallback`.
-- Real Whisper or faster-whisper execution.
+- Installation, model download, and live execution of faster-whisper.
 - Transcript API fallback.
 - LLM knowledge extraction.
+
+## v0.5.3a FasterWhisperBackend Boundary
+
+`FasterWhisperBackend` accepts an existing `NormalizedAudio` and maps
+faster-whisper output into the stable transcript contract:
+
+```text
+NormalizedAudio
+-> validate existing local file
+-> lazy import faster_whisper
+-> construct WhisperModel
+-> transcribe
+-> TranscriptSegment list
+-> TranscriptResult(provider="faster_whisper")
+```
+
+Construction only stores `model_size`, `device`, `compute_type`, and optional
+`language`; it does not import faster-whisper, load a model, inspect files, or
+access the network. Input existence and file checks run before the optional
+dependency import. Missing dependency and runtime failures use stable sanitized
+errors without local paths, cache paths, raw exceptions, or tracebacks.
+
+The boundary preserves segment order and maps second offsets to
+`HH:MM:SS.mmm`. Its transcript provider list contains only `faster_whisper`, not
+audio acquisition or normalizer ids. The current `TranscriptResult` contract
+has no language field, so the configured language is passed to faster-whisper
+but detected language cannot yet be represented in the returned result.
+
+This stage uses mocked unit tests only. faster-whisper is not installed by this
+stage, no model is downloaded, live transcription is not validated, and the
+backend is not selected by the pipeline or `real-fallback`. Retained cache and
+live audio acquisition also remain incomplete.
 
 ## URL Intake Boundaries
 

@@ -113,3 +113,10 @@
 - Added `AudioWorkspace` for registered temporary audio artifact cleanup.
 - Added context-exit cleanup, reverse registration order, stable cleanup errors, and protection for local or workspace-external files.
 - Kept cache retention, yt-dlp execution, ffmpeg execution, Whisper, CLI, pipeline, and fallback integration out of the stage.
+
+## 2026-07-12
+
+- Added `FasterWhisperBackend` for mapping existing normalized audio through the optional faster-whisper Python API.
+- Added input-first validation, lazy dependency loading, stable sanitized local transcription errors, timestamp formatting, and empty-result handling.
+- Added mocked tests for dependency absence, model configuration, path forwarding, segment mapping, failure sanitization, input preservation, and Mock backend regression.
+- Kept dependency installation, model download, live ASR, pipeline integration, fallback integration, retained cache, and live audio acquisition out of this stage.

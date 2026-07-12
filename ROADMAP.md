@@ -58,7 +58,9 @@ Status: Completed at `v0.3.0`.
 - [ ] Add separately approved retained-cache behavior.
 - [ ] Run a separately confirmed live audio acquisition smoke test.
 - [ ] Wire real ffmpeg normalization into an explicitly selected fallback path.
-- [ ] Add local Whisper or faster-whisper transcription behind the stable audio and transcript boundaries.
+- [x] Add the mocked `FasterWhisperBackend` boundary behind the stable audio and transcript contracts.
+- [ ] Install faster-whisper, obtain a model, and validate real local transcription after separate approval.
+- [ ] Wire real local transcription into an explicitly selected fallback path.
 - Keep local transcription separate from metadata and LLM work.
 - Require explicit future confirmation before audio acquisition or dependency installation.
 

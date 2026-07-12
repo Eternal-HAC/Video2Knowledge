@@ -31,7 +31,9 @@
 - [x] Add AudioWorkspace cleanup for registered temporary audio artifacts.
 - [ ] Add separately approved audio cache retention.
 - [ ] Run a separately confirmed live audio acquisition smoke test.
-- [ ] Add faster-whisper backend.
+- [x] Add mocked faster-whisper backend boundary.
+- [ ] Install faster-whisper and download or select a model after explicit approval.
+- [ ] Run a separately confirmed live faster-whisper transcription test.
 - [ ] Add transcript API fallback.
 - [ ] Add local Whisper fallback.
 - [ ] Add configurable LLM summarizer.

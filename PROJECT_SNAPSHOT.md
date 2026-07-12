@@ -2,7 +2,7 @@
 
 ## Snapshot Date
 
-2026-07-11
+2026-07-12
 
 ## Current Version
 
@@ -16,7 +16,7 @@ Video2Knowledge is a Local First video-to-knowledge pipeline that converts suppo
 
 ## Current Stage
 
-The latest tagged release is `v0.4.0 Official Transcript`. Development is currently in `v0.5.x Whisper Fallback`, with policy, Mock fallback, audio boundaries, cache safety, and local ffmpeg normalization validated.
+The latest tagged release is `v0.4.0 Official Transcript`. Development is currently in `v0.5.x Whisper Fallback`, with policy, Mock fallback, audio boundaries, cache safety, local ffmpeg normalization, workspace cleanup, and the mocked faster-whisper backend boundary validated.
 
 ## Completed
 
@@ -38,6 +38,7 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - User-confirmed local ffmpeg smoke test with `ffprobe` validation of 16 kHz mono `pcm_s16le` WAV output.
 - YouTube-only `YtDlpAudioProvider` boundary with explicit permission, audio-only yt-dlp Python API options, and mocked backend tests.
 - AudioWorkspace cleanup boundary for registered temporary audio artifacts.
+- FasterWhisperBackend boundary for existing normalized audio with lazy optional dependency loading, sanitized errors, and mocked segment mapping tests.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -50,7 +51,7 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - User-confirmed live audio acquisition.
 - Retained-cache behavior.
 - ffmpeg integration into the default fallback path.
-- Real Whisper/faster-whisper execution.
+- faster-whisper installation, model acquisition, and live transcription validation.
 - LLM providers.
 - Obsidian automation.
 - Notion export.
@@ -75,12 +76,13 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - The ffmpeg normalizer boundary is available for existing local audio files but is not used by `real-fallback` by default.
 - `YtDlpAudioProvider` is YouTube-only, defaults to disabled, produces temporary audio artifacts, and is not connected to `real-fallback`.
 - AudioWorkspace removes only registered temporary files in its private directory; it does not delete local user files or unknown workspace content.
+- `FasterWhisperBackend` validates local normalized audio before importing its optional dependency, does not expose local paths or raw runtime failures, and is not connected to `real-fallback`.
 
 ## Next Steps
 
 1. Add separately approved audio cache retention.
 2. Keep the existing default `real-fallback` Mock-only until a separate integration stage is approved.
-3. Add real Whisper or faster-whisper only after acquisition and cleanup behavior are stable.
+3. Install and validate faster-whisper only after separate dependency, model, and live-test approval; keep it disconnected from fallback until a separate integration stage.
 4. Keep Transcript API fallback, LLM extraction, and export expansion in separate stages.
 
 ## Live Validation Notes
