@@ -134,3 +134,11 @@
 - Confirmed one non-empty `TranscriptResult` segment with stable provider ids while preserving the input audio and tracked worktree.
 - Added the optional `asr` packaging extra pinned to `faster-whisper==1.2.1`; base installation remains free of the local ASR dependency set.
 - Documented that model files are acquired and cached separately, the first-run timing is not a stable benchmark, and pipeline, `real-fallback`, live audio acquisition, and retained cache remain incomplete.
+
+## 2026-07-12
+
+- Added a non-CLI local-file-to-ASR orchestration boundary in `app.pipeline` using `LocalFileAudioProvider`, `AudioWorkspace`, an injected normalizer, and an injected Whisper backend.
+- Required normalized artifacts to pass workspace ownership checks before transcription and preserved the backend `TranscriptResult` unchanged.
+- Added narrowly scoped best-effort cleanup for partial ffmpeg output after timeout, startup failure, or non-zero exit.
+- Added mocked integration and lifecycle coverage without running real ffmpeg, faster-whisper, user media, or network access.
+- Kept CLI, default pipeline, `real-fallback`, YouTube acquisition, retained cache, and model-cache management unchanged.

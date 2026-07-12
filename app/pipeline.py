@@ -6,9 +6,18 @@ the pipeline instead of directly composing provider modules.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.audio import (
+    AudioNormalizer,
+    AudioProvider,
+    AudioWorkspace,
+    FfmpegAudioNormalizer,
+    LocalFileAudioProvider,
+    NormalizedAudio,
+)
 from app.downloader import get_metadata_with_provider
 from app.exporter.obsidian import export_markdown
 from app.markdown_writer import render_markdown
@@ -16,6 +25,10 @@ from app.models import Summary, TranscriptResult, VideoMetadata, VideoSource
 from app.platform_adapter import get_platform_capabilities, resolve_video_source
 from app.summarizer import summarize_mock
 from app.transcript import acquire_transcript_with_provider
+from app.whisper import WhisperBackend
+
+
+_NormalizerFactory = Callable[[Path], AudioNormalizer]
 
 
 @dataclass(frozen=True)
@@ -32,6 +45,30 @@ class ImportPipelineResult:
     transcript_result: TranscriptResult
     summary: Summary
     output_path: Path
+
+
+def transcribe_local_media(
+    metadata: VideoMetadata,
+    *,
+    whisper_backend: WhisperBackend[NormalizedAudio],
+    audio_provider: AudioProvider | None = None,
+    normalizer_factory: _NormalizerFactory | None = None,
+) -> TranscriptResult:
+    """Transcribe one user-owned local media file through injected boundaries."""
+
+    provider = audio_provider or LocalFileAudioProvider()
+    original_artifact = provider.acquire(metadata)
+
+    with AudioWorkspace() as workspace:
+        if normalizer_factory is None:
+            normalizer: AudioNormalizer = FfmpegAudioNormalizer(
+                output_dir=workspace.path
+            )
+        else:
+            normalizer = normalizer_factory(workspace.path)
+        normalized_artifact = normalizer.normalize(original_artifact)
+        workspace.register(normalized_artifact)
+        return whisper_backend.transcribe(normalized_artifact)
 
 
 def run_import_pipeline(

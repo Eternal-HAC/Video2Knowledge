@@ -304,7 +304,7 @@ class FfmpegAudioNormalizer:
         ffmpeg = self._resolve_ffmpeg()
         output_dir = self.output_dir or Path(tempfile.gettempdir())
         output_path = output_dir / f"{input_path.stem}-16k-mono.wav"
-        if output_path.exists():
+        if output_path.exists() or output_path.is_symlink():
             raise AudioProcessingError("ffmpeg normalized output already exists")
 
         command = [
@@ -330,12 +330,17 @@ class FfmpegAudioNormalizer:
                 text=True,
                 timeout=self.timeout_seconds,
             )
-        except subprocess.TimeoutExpired as error:
+        except subprocess.TimeoutExpired:
+            _remove_failed_normalized_output(output_path, output_dir)
             raise AudioProcessingError(
                 "ffmpeg audio normalization timed out"
-            ) from error
+            ) from None
+        except OSError:
+            _remove_failed_normalized_output(output_path, output_dir)
+            raise AudioProcessingError("ffmpeg audio normalization failed") from None
 
         if result.returncode != 0:
+            _remove_failed_normalized_output(output_path, output_dir)
             raise AudioProcessingError("ffmpeg audio normalization failed")
         if not output_path.exists():
             raise AudioProcessingError("ffmpeg normalized output missing")
@@ -356,6 +361,23 @@ class FfmpegAudioNormalizer:
         if not ffmpeg:
             raise FfmpegNotFoundError("ffmpeg not found")
         return ffmpeg
+
+
+def _remove_failed_normalized_output(output_path: Path, output_dir: Path) -> None:
+    """Best-effort removal of only this call's failed normalized output."""
+
+    try:
+        resolved_output_dir = output_dir.resolve()
+        resolved_output = output_path.resolve()
+        if not resolved_output.is_relative_to(resolved_output_dir):
+            return
+        if not output_path.exists() and not output_path.is_symlink():
+            return
+        if not output_path.is_file() and not output_path.is_symlink():
+            return
+        output_path.unlink()
+    except OSError:
+        return
 
 
 def _downloaded_audio_path(

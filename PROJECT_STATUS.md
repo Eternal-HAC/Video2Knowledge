@@ -414,3 +414,29 @@ Remaining boundaries:
 - `TranscriptResult` has no detected-language field.
 - Pure-silence semantics and exact half-millisecond timestamp rounding are not formal product contracts.
 - GPU/CUDA and formal model-cache location, lifecycle, and cleanup remain unvalidated or undesigned.
+
+## 2026-07-12
+
+Status: `v0.5.4a Local File ASR Orchestration` implementation complete.
+
+Changes:
+
+- Added `transcribe_local_media` in `app.pipeline` for composing a local file provider, private audio workspace, normalizer, and caller-supplied Whisper backend.
+- Keep the user-owned source artifact outside workspace ownership and require normalized output registration before transcription.
+- Return the backend `TranscriptResult` unchanged so audio and normalizer ids do not enter transcript provider history.
+- Add best-effort cleanup for only the newly calculated ffmpeg output after timeout, startup `OSError`, or non-zero exit.
+- Preserve stable acquisition, processing, transcription, and cleanup errors without adding an orchestration-level exception.
+
+Validation:
+
+- Mocked orchestration tests use temporary placeholder files only and do not run real ffmpeg, faster-whisper, or network access.
+- Targeted local ASR orchestration tests passed: 16 tests.
+- Full unit tests passed: 111 tests.
+- Existing Mock CLI regression passed.
+
+Remaining boundaries:
+
+- The orchestration is not exposed by CLI and is not connected to `real-fallback` or the default import pipeline.
+- A complete real local-file-to-ASR integration smoke test has not run.
+- YouTube live audio acquisition, retained audio cache, and formal model-cache management remain incomplete.
+- Detected-language, pure-silence, and exact timestamp-rounding contracts remain unchanged and unresolved.

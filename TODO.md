@@ -35,6 +35,8 @@
 - [x] Install faster-whisper and obtain the small model after explicit approval.
 - [x] Run a separately confirmed standalone faster-whisper CPU transcription test.
 - [x] Declare faster-whisper as the optional `asr` dependency set.
+- [x] Add mocked local-file-to-ASR orchestration.
+- [ ] Run a separately approved real local-file-to-ASR integration smoke test.
 - [ ] Add transcript API fallback.
 - [ ] Add local Whisper fallback.
 - [ ] Add configurable LLM summarizer.

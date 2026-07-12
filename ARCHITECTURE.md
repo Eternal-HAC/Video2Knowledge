@@ -65,6 +65,8 @@ raw input
 - `platform_adapter` classifies URL and local file inputs and infers platform labels.
 - `platform_adapter` exposes platform capabilities for provider planning.
 - `pipeline` owns the import business flow so CLI stays thin.
+- `pipeline` also exposes a non-CLI local-file ASR orchestration boundary that
+  composes injected audio, normalization, workspace, and Whisper components.
 - `downloader` exposes Mock metadata and real YouTube metadata-only extraction.
 - `transcript` provides Mock transcripts, official YouTube VTT/WebVTT subtitles, fallback eligibility policy, and Mock Whisper fallback orchestration.
 - `audio` provides Mock audio boundaries and a real ffmpeg normalizer for existing local files.
@@ -363,6 +365,45 @@ not package model files. Model acquisition remains a separate first-use or
 explicit preparation action. The backend is still not selected by the pipeline
 or `real-fallback`; retained cache and live YouTube audio acquisition also
 remain incomplete.
+
+## v0.5.4a Local File ASR Orchestration
+
+`transcribe_local_media` in `app.pipeline` composes the existing boundaries for
+one user-owned local file without changing the default import pipeline:
+
+```text
+local VideoMetadata
+-> LocalFileAudioProvider
+-> AudioArtifact(temporary=False)
+-> private AudioWorkspace
+-> FfmpegAudioNormalizer
+-> NormalizedAudio(temporary=True)
+-> workspace registration
+-> injected WhisperBackend
+-> TranscriptResult
+-> workspace cleanup
+```
+
+The Whisper backend is always supplied by the caller. The audio provider may
+be injected and otherwise defaults to `LocalFileAudioProvider`. A normalizer
+factory may be injected; the default constructs `FfmpegAudioNormalizer` only
+after entering the workspace and directs its output into the private directory.
+The orchestration does not read CLI, environment, YAML, or global configuration.
+
+The original user file is never registered with the workspace and is not
+copied, modified, moved, or deleted. A normalized artifact must pass the
+existing temporary, regular-file, existence, and workspace-containment checks
+before transcription. Registered normalized output is removed on successful
+return, transcription failure, or control-flow exit. Ffmpeg timeout, startup
+failure, and non-zero exit also make a best-effort non-recursive removal of
+only the newly calculated output path, without masking the processing error.
+
+This stage is validated only through mocked integration tests and placeholder
+temporary files. It is not exposed by the CLI, is not selected by the default
+pipeline or `real-fallback`, and has not received a full real local-file-to-ASR
+integration smoke test. YouTube acquisition, retained audio cache, detected
+language, pure-silence semantics, timestamp rounding policy, and model-cache
+management remain separate work.
 
 ## URL Intake Boundaries
 
