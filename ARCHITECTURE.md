@@ -81,8 +81,9 @@ Implemented provider boundaries have narrow responsibilities:
 - Transcript strategy: `real-fallback` for official subtitles followed only by eligible Mock local fallback.
 - Audio normalizer: `ffmpeg_audio_normalizer` for existing local audio files, not wired into the default fallback chain.
 
-Real audio acquisition is not validated. A standalone faster-whisper CPU smoke
-test has passed, but the backend remains disconnected from the pipeline and
+Real audio acquisition is not validated. Standalone faster-whisper CPU and
+non-CLI local-file-to-ASR integration smoke tests have passed, but the real
+backend remains disconnected from the default import pipeline and
 `real-fallback`. Transcript API fallback and LLM knowledge extraction are not
 implemented.
 
@@ -129,8 +130,9 @@ This stage does not download media, fetch subtitles, run Whisper, call LLMs, or 
 - OpenAI-compatible, Anthropic, or Gemini APIs for LLM summarization.
 
 Transcript API fallback and LLM providers remain unimplemented. The real
-faster-whisper backend is implemented and standalone CPU execution is
-validated, but runtime orchestration remains unimplemented.
+faster-whisper backend and the non-CLI local-file orchestration are implemented
+and have passed separate CPU smoke tests, but neither is selected by the default
+import pipeline or `real-fallback`.
 
 ## v0.4.x Official Transcript
 
@@ -306,6 +308,9 @@ Completed:
   sanitized errors, and mocked segment mapping tests.
 - Standalone faster-whisper CPU smoke test using the pinned `asr` dependency
   combination and an existing normalized WAV input.
+- Real non-CLI local-file-to-ASR integration smoke test through
+  `transcribe_local_media`, real ffmpeg normalization, and the faster-whisper
+  backend on CPU.
 
 Not implemented:
 
@@ -413,12 +418,21 @@ one `temporary=True` artifact created by the call, clean its own partial output
 before raising when possible, and avoid unknown side files. Orchestration cannot
 safely claim files that a failing normalizer did not return.
 
-This stage is validated only through mocked integration tests and placeholder
-temporary files. It is not exposed by the CLI, is not selected by the default
-pipeline or `real-fallback`, and has not received a full real local-file-to-ASR
-integration smoke test. YouTube acquisition, retained audio cache, detected
-language, pure-silence semantics, timestamp rounding policy, and model-cache
-management remain separate work.
+Mocked integration tests and a separately approved real local-file integration
+smoke test have validated this stage. The real smoke test used a user-owned AAC
+M4A input on Windows with Python 3.13.7, the default `LocalFileAudioProvider`,
+a private `AudioWorkspace`, real `FfmpegAudioNormalizer`, and
+`FasterWhisperBackend("Systran/faster-whisper-small", device="cpu",
+compute_type="int8", language=None)`. It produced one `TranscriptResult`
+segment while preserving the source SHA-256; the temporary 16 kHz mono WAV and
+workspace existed for transcription and were removed afterwards. Its observed
+elapsed time on this short cached-model sample is not a benchmark or accuracy
+result.
+
+The orchestration remains non-CLI and is not selected by the default import
+pipeline or `real-fallback`. It does not validate YouTube audio acquisition,
+retained audio cache, detected language, pure-silence semantics, timestamp
+rounding policy, GPU/CUDA, VAD, batch mode, or model-cache management.
 
 ## URL Intake Boundaries
 

@@ -16,7 +16,7 @@ Video2Knowledge is a Local First video-to-knowledge pipeline that converts suppo
 
 ## Current Stage
 
-The latest tagged release is `v0.4.0 Official Transcript`. Development is currently in `v0.5.x Whisper Fallback`, with policy, Mock fallback, audio boundaries, cache safety, local ffmpeg normalization, workspace cleanup, the faster-whisper backend boundary, and a standalone CPU smoke test validated.
+The latest tagged release is `v0.4.0 Official Transcript`. Development is currently in `v0.5.x Whisper Fallback`, with policy, Mock fallback, audio boundaries, cache safety, local ffmpeg normalization, workspace cleanup, the faster-whisper backend boundary, standalone CPU transcription, and non-CLI local-file-to-ASR integration validated.
 
 ## Completed
 
@@ -43,6 +43,10 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - Optional `asr` dependency set pinned to the validated `faster-whisper==1.2.1` runtime.
 - Mocked local-file ASR orchestration with strict local metadata, user-owned
   source-artifact validation, private normalized-output ownership, and cleanup.
+- Separately approved real local-file-to-ASR integration smoke test on Windows:
+  user-owned AAC M4A -> private workspace -> real ffmpeg normalization ->
+  faster-whisper small model on CPU `int8` -> `TranscriptResult`, with source
+  SHA-256 preserved and temporary output cleaned.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -94,7 +98,7 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 
 1. Add separately approved audio cache retention.
 2. Keep the existing default `real-fallback` Mock-only until a separate integration stage is approved.
-3. Keep local-file ASR orchestration disconnected from CLI and `real-fallback` until a separate integration stage and real smoke test are approved.
+3. Keep local-file ASR orchestration disconnected from CLI and `real-fallback` until a separate integration stage is approved.
 4. Keep Transcript API fallback, LLM extraction, and export expansion in separate stages.
 
 ## Live Validation Notes
@@ -108,6 +112,13 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - Local ffmpeg validation used an existing user-approved audio file and produced an ignored runtime WAV artifact under `output/cache/audio/`.
 - `ffprobe` confirmed `pcm_s16le`, `16000 Hz`, and one audio channel.
 - A standalone faster-whisper CPU smoke test returned one non-empty segment for an existing 5.482688-second normalized WAV. The first 39.169-second end-to-end run included model acquisition and loading and is not a stable benchmark.
+- A separate non-CLI local-file integration smoke test used a user-owned
+  5.51-second AAC M4A at 48 kHz stereo. Real ffmpeg created a temporary 16 kHz
+  mono WAV in the private workspace; faster-whisper small on CPU `int8` returned
+  one segment from `00:00:00.000` to `00:00:05.000`. The source SHA-256 was
+  unchanged, and the normalized file and workspace were removed after return.
+  The observed 9.217-second elapsed time used an existing offline model cache
+  and is not a benchmark or accuracy evaluation.
 
 ## Must Read Files for Continuation
 

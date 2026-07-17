@@ -464,3 +464,35 @@ Remaining boundaries:
 
 - The orchestration remains absent from CLI and `real-fallback`.
 - A separately approved real local-file-to-ASR integration smoke test remains pending.
+
+## 2026-07-17
+
+Status: Real non-CLI local-file-to-ASR integration smoke test passed.
+
+Validation:
+
+- On Windows with Python 3.13.7, a user-owned AAC M4A input (48 kHz, stereo,
+  about 5.51 seconds) entered the formal `transcribe_local_media()` path.
+- The default `LocalFileAudioProvider`, private `AudioWorkspace`, real
+  `FfmpegAudioNormalizer`, and `FasterWhisperBackend` with
+  `Systran/faster-whisper-small`, CPU `int8`, and `language=None` returned a
+  `TranscriptResult` with provider and attempted providers both set to
+  `faster_whisper` and one segment from `00:00:00.000` to `00:00:05.000`.
+- The source SHA-256 was unchanged. The normalized temporary 16 kHz mono WAV
+  existed during Whisper execution and the normalized artifact and workspace
+  were removed on return.
+- The observed 9.217-second elapsed time used an existing offline model cache
+  on one short sample; it is neither a stable benchmark nor an accuracy result.
+- Project-standard validation passed. The current suite runs 120 tests, with
+  one platform-dependent symlink test skipped when Windows cannot create it.
+
+Remaining boundaries:
+
+- No supported CLI local-ASR entry point exists; installing `.[asr]` does not
+  enable one.
+- The default import pipeline and `real-fallback` remain Mock-only for audio and
+  ASR. The smoke test does not validate YouTube live audio acquisition or a
+  YouTube no-subtitle-to-Whisper fallback.
+- Retained cache, detected-language contract, pure-silence semantics,
+  half-millisecond timestamp rules, GPU/CUDA, VAD, batch mode, formal model
+  cache lifecycle, and LLM knowledge extraction remain incomplete.

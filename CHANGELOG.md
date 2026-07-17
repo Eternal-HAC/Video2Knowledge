@@ -150,3 +150,9 @@
 - Added limited provisional ownership for the exact normalized workspace object returned before registration, with non-recursive best-effort cleanup on registration failure.
 - Preserved user inputs, external paths, symlink targets, unknown workspace content, business errors, and control-flow exceptions under cleanup failure.
 - Added mocked lifecycle and SHA-256 input-protection coverage without running real ffmpeg, faster-whisper, network, or model operations.
+
+## 2026-07-17
+
+- Recorded a separately approved real non-CLI local-file-to-ASR integration smoke test through `transcribe_local_media`, real ffmpeg normalization, and faster-whisper small on CPU `int8` using an existing offline model cache.
+- Confirmed the user-owned AAC source remained unchanged, the temporary normalized WAV and private workspace were cleaned, and the call returned one `TranscriptResult` segment.
+- Kept CLI local ASR, default-pipeline and `real-fallback` real-ASR integration, YouTube live audio acquisition, retained cache, model-cache policy, and LLM knowledge extraction out of scope.

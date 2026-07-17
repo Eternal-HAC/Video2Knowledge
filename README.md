@@ -41,15 +41,20 @@ Current development milestone: `v0.5.x Whisper Fallback`
 - Verified local ffmpeg smoke test producing 16 kHz mono PCM WAV.
 - `FasterWhisperBackend` boundary for existing normalized audio, with lazy
   optional dependency loading and sanitized runtime errors.
+- Verified non-CLI local-file ASR integration through `transcribe_local_media`:
+  a user-owned local M4A was normalized by ffmpeg and transcribed by
+  faster-whisper on CPU into `TranscriptResult`, while preserving the source
+  file and cleaning the temporary normalized artifact and workspace.
 
 ## Not Implemented
 
 - Real audio acquisition or media download for fallback.
 - ffmpeg integration into the default `real-fallback` chain.
-- faster-whisper integration into the pipeline or `real-fallback`. The backend
-  boundary, optional dependency combination, small model, and standalone CPU
-  transcription have been validated, but no supported end-to-end CLI path uses
-  them yet.
+- faster-whisper selection in the default import pipeline or `real-fallback`.
+  The backend boundary, optional dependency combination, standalone CPU
+  transcription, and non-CLI local-file integration have been validated, but no
+  supported end-to-end CLI path uses them yet.
+- A supported CLI entry point for real local-file ASR.
 - Automatic captions.
 - Transcript API fallback.
 - LLM knowledge extraction.
@@ -125,6 +130,14 @@ It does not download or read media, run ffmpeg, or run Whisper.
 
 A user-confirmed local smoke test passed with `ffprobe` validation. This boundary is not connected to `real-fallback` by default.
 
+The non-CLI `transcribe_local_media` boundary has also completed a separately
+approved real local-file integration smoke test with the default local provider,
+private workspace, real ffmpeg normalization, and `FasterWhisperBackend` on
+CPU. It returned `TranscriptResult` while leaving the user-owned source file
+unchanged and cleaning temporary output. This does not add a CLI command, does
+not connect real ASR to the default import pipeline or `real-fallback`, and does
+not validate YouTube audio acquisition.
+
 Audio acquisition, media download, and retained audio cache require explicit user confirmation per stage. Runtime media artifacts belong under ignored `output/` or `cache/` paths.
 
 ## Run Tests
@@ -133,7 +146,8 @@ Audio acquisition, media download, and retained audio cache require explicit use
 python -m unittest discover -s tests
 ```
 
-Current test baseline: `95` tests.
+Current test baseline: `120` tests. The current Windows environment skips one
+platform-dependent symlink test when symlink creation is unavailable.
 
 ## Installation
 
@@ -157,7 +171,7 @@ concerns rather than a current product policy.
 
 `FasterWhisperBackend` is currently available only as a code boundary. The CLI
 and `real-fallback` do not select it yet, so these installation commands do not
-enable an end-to-end real ASR CLI path.
+enable an end-to-end real ASR CLI path or a supported local-ASR CLI command.
 
 ## Markdown Output
 
