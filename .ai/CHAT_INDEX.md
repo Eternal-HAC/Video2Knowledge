@@ -24,7 +24,7 @@
 - 所在平台：ChatGPT Web。
 - 主要职责：讨论产品定位、系统架构、Roadmap、阶段设计，以及需要长期保留的重大决策候选。
 - 不要处理：具体代码修改、单个 Bug 排查、临时环境问题或未经评审就直接安排实施。
-- 何时交接：方案形成明确目标、范围、排除项和验收标准后，交给 Codex Desktop 的 `V2K - Main Development`；需要外部证据时交给 `V2K - Research`；`V2K - Local Review` 发现产品、架构或阶段设计问题时，也将问题交回本线程。
+- 何时交接：方案形成明确目标、范围、排除项和验收标准后，交给 Codex Desktop 的 `V2K - Main Development`；需要外部证据时交给 `V2K - Research`；`V2K - Codex Review` 发现产品、架构或阶段设计问题时，也将问题交回本线程。
 - 正式记录：产品结论写入 `PRD.md`，架构结论写入 `ARCHITECTURE.md`，版本与阶段安排写入 `ROADMAP.md`，重大决策写入 `DECISIONS.md`。
 
 #### V2K - Research
@@ -32,8 +32,16 @@
 - 所在平台：ChatGPT Web。
 - 主要职责：调研外部资料、GitHub 项目、竞品，以及 yt-dlp、ffmpeg、Whisper、LLM、Obsidian、MCP 等技术选型。
 - 不要处理：直接修改真实工作区，或把外部项目的做法自动视为 Video2Knowledge 的正式决定。
-- 何时交接：调研结果需要形成产品或架构选择时，交给 `V2K - Architecture & Product`；需要在真实仓库中验证时，交给 Codex Desktop 的 `V2K - Experiment` 或 `V2K - Main Development`；`V2K - Local Review` 遇到需要外部资料核实的技术事实时，也将问题交给本线程。
+- 何时交接：调研结果需要形成产品或架构选择时，交给 `V2K - Architecture & Product`；需要在真实仓库中验证时，交给 Codex Desktop 的 `V2K - Experiment` 或 `V2K - Main Development`；`V2K - Codex Review` 遇到需要外部资料核实的技术事实时，也将问题交给本线程。
 - 正式记录：经过确认的产品影响写入 `PRD.md`，架构选择写入 `ARCHITECTURE.md`，重大选型理由写入 `DECISIONS.md`，实施阶段安排写入 `ROADMAP.md`。
+
+#### V2K - Codex Review
+
+- 所在平台：ChatGPT Web。
+- 主要职责：独立审查已经发布到 GitHub review branch 或 Pull Request 的真实代码、commit range、完整 diff、测试或 CI 证据、文档同步和提交整洁性；低风险直接 main 流程中，可以审查用户提供的完整 commit 或 diff 材料。
+- 不要处理：不把 Codex 的文字总结当作唯一证据，不声称直接读取尚未发布的本地工作区，不直接修改代码或文档，不创建 commit，不 push review branch 或 main，不 merge，不 tag，也不替用户作最终发布授权。
+- 何时交接：发现具体缺陷时交给 Codex Desktop 的 `V2K - Bug Fix`；发现产品、架构或阶段设计问题时交给 `V2K - Architecture & Product`；需要外部证据时交给 `V2K - Research`；需要隔离试验时交给 Codex Desktop 的 `V2K - Experiment`；Review 通过后由用户决定是否授权 merge 或 push main。
+- 正式记录：Review 证据和结论优先保留在 GitHub Pull Request、review branch、commit 或对应对话索引中；需要长期保留的产品、架构、状态或待办结论，由接收任务的线程写入职责对应的正式项目文档。
 
 #### V2K - Debug
 
@@ -56,26 +64,17 @@
 #### V2K - Main Development
 
 - 所在平台：Codex Desktop。
-- 主要职责：执行已经确认的正式阶段，包括读取真实工作区、实施、测试、同步相关文档和创建本地 commit。
-- 不要处理：未经确认改变产品范围或架构、把多个阶段合并实施、擅自执行需要授权的操作，或未经用户确认 push。
-- 何时交接：本地提交完成后，交给 Codex Desktop 的 `V2K - Local Review`；遇到需要重新设计的范围或架构问题时，交给 `V2K - Architecture & Product`；发现独立缺陷时可转入 `V2K - Bug Fix`。
+- 主要职责：执行已经确认的正式阶段，包括读取真实工作区、实施、测试、同步相关文档、创建本地 commit，并依据完整 diff、测试和 Git 状态完成 Codex Self Review。完成阶段时返回 branch、HEAD、`origin/main`、ahead/behind、commit、修改文件、实现与验证结果、diff check、ignored status、已知风险和 review branch 建议。
+- 不要处理：未经确认改变产品范围或架构、把多个阶段合并实施、用 Codex 自查替代 Web 独立 review、擅自执行需要授权的操作，或未经用户确认发布 review branch、创建 Pull Request、merge、push main 或 tag。
+- 何时交接：本地提交和 Codex 自查完成后，先等待用户授权发布 review branch；发布后交给 ChatGPT Web 的 `V2K - Codex Review`。遇到需要重新设计的范围或架构问题时，交给 `V2K - Architecture & Product`；发现独立缺陷时可转入 `V2K - Bug Fix`。极低风险任务经用户明确确认后，可以向 Web 提供完整 commit 或 diff，采用不发布 review branch 的短路径。
 - 正式记录：实现进展写入 `PROJECT_STATUS.md`，阶段边界写入 `PROJECT_SNAPSHOT.md`，待办写入 `TODO.md`，代码职责变化写入 `PROGRAM_MAP.md`，架构或重大决策变化分别写入 `ARCHITECTURE.md` 和 `DECISIONS.md`。
-
-#### V2K - Local Review
-
-- 所在平台：Codex Desktop，必须使用独立于被审查实现线程的对话。
-- 主要职责：独立审查其他 Codex Desktop 线程产生的本地提交；读取真实本地仓库、待审查 commit 及其父提交、完整 diff、Git 状态和测试环境；复跑适当测试；检查功能正确性、范围、回归风险、安全边界、文档同步和提交整洁性。
-- Findings 格式：发现项按 High、Medium、Low 排序，并明确给出“不建议 push”“可以 push，但存在非阻塞风险”“可以 push”或“证据不足”中的一个结论。
-- 不要处理：不修改代码或文档，不创建 commit，不 push，不把被审查线程的文字总结当作唯一证据，也不擅自执行需要用户批准的安装、联网、媒体下载或真实 Provider 验证。
-- 何时交接：发现范围明确的问题时交给 `V2K - Bug Fix`；需要重新设计产品、架构或阶段时交给 Web 的 `V2K - Architecture & Product`；需要外部证据时交给 Web 的 `V2K - Research`；需要隔离实验时交给 `V2K - Experiment`；审查通过后由用户决定是否授权 push。
-- 正式记录：审查本身通常不修改正式项目文档；具体实现历史保留在 Git 提交和 Pull Request。若审查发现长期问题，由接收返工或设计任务的线程更新对应正式文档。
 
 #### V2K - Bug Fix
 
 - 所在平台：Codex Desktop。
-- 主要职责：处理范围明确的独立缺陷、测试失败，以及 `V2K - Local Review` 提出的具体返工项，并创建独立修复 commit。
-- 不要处理：借修复之机扩大功能范围、进行无关重构、改变正式架构，或混入新的开发阶段。
-- 何时交接：修复、验证并创建独立本地 commit 后，交回 `V2K - Local Review`；发现根因属于架构或产品设计时，交给 `V2K - Architecture & Product`；需要高风险验证时转入 `V2K - Experiment`。
+- 主要职责：处理范围明确的独立缺陷、测试失败，以及 `V2K - Codex Review` 提出的具体返工项；完成修复、验证、文档同步、独立本地 commit 和 Codex Self Review。
+- 不要处理：借修复之机扩大功能范围、进行无关重构、改变正式架构、用 Codex 自查代替 Web 复审，或混入新的开发阶段。
+- 何时交接：修复和 Codex 自查完成后，等待用户授权更新同一 review branch，再交回 Web 的 `V2K - Codex Review`；发现根因属于架构或产品设计时，交给 `V2K - Architecture & Product`；需要高风险验证时转入 `V2K - Experiment`。
 - 正式记录：缺陷状态和验证结果写入 `PROJECT_STATUS.md`，遗留事项写入 `TODO.md`，架构性根因写入 `ARCHITECTURE.md` 或 `DECISIONS.md`，具体修复历史保留在 Git 提交和 Pull Request。
 
 #### V2K - Experiment
@@ -83,18 +82,20 @@
 - 所在平台：Codex Desktop。
 - 主要职责：开展可能废弃的技术验证、原型试验和 benchmark，为正式方案提供本地证据。
 - 不要处理：直接改变正式架构、把实验代码混入主开发提交、把一次 benchmark 当作普遍结论，或未经确认使用网络、认证和媒体下载。
-- 何时交接：实验结果需要产品或架构判断时，交给 ChatGPT Web 的 `V2K - Architecture & Product`；需要补充外部资料时交给 `V2K - Research`；方案获批并准备正式实现时交给 `V2K - Main Development`；`V2K - Local Review` 遇到需要隔离验证的高不确定性问题时，也将问题交给本线程。
+- 何时交接：实验结果需要产品或架构判断时，交给 ChatGPT Web 的 `V2K - Architecture & Product`；需要补充外部资料时交给 `V2K - Research`；方案获批并准备正式实现时交给 `V2K - Main Development`；`V2K - Codex Review` 遇到需要隔离验证的高不确定性问题时，也将问题交给本线程。
 - 正式记录：实验过程通常不写入正式项目文档；被采纳的架构结论写入 `ARCHITECTURE.md` 或 `DECISIONS.md`，形成实施阶段后写入 `ROADMAP.md` 和 `TODO.md`，benchmark 数据应保留可复现条件。
 
 ### 统一判断规则
 
 - 需要读取或修改真实工作区的任务交给 Codex Desktop。
 - 产品、架构、外部研究和未来想法放在 ChatGPT Web。
-- 本地提交审查放在 Codex Desktop 的 `V2K - Local Review`。
-- Web 端不直接声称验证了本地 diff、Git 状态或测试环境。
-- `V2K - Main Development` 和 `V2K - Bug Fix` 可以自查，但不能用自查替代必要的独立 Local Review。
-- Local Review 给出 push 建议，最终 push 仍需用户明确授权。
-- 审查发现架构问题时返回 `V2K - Architecture & Product`，而不是由 Local Review 自行改变架构。
+- `V2K - Main Development` 和 `V2K - Bug Fix` 负责本地验证、提交与 Codex Self Review，但自查不能替代 Web 独立 review。
+- GitHub review branch、Pull Request、commit diff、测试证据和文档的独立审查放在 ChatGPT Web 的 `V2K - Codex Review`。
+- Web 端不直接声称验证了尚未发布的本地 diff、Git 状态或本地测试环境；其独立审查以 GitHub 上的真实内容和明确提供的验证证据为准。
+- 重要阶段优先使用 `review/<stage-name>`；发布 review branch 前必须获得用户明确授权，Pull Request 只在用户明确要求后创建。
+- 极低风险任务可以使用完整 commit 或 diff 进行 Web Review 后直接 push main，但仍需用户明确确认。
+- Web Review 给出审查结论，最终 merge、push main 或 tag 仍需用户明确授权。
+- 审查发现架构问题时返回 `V2K - Architecture & Product`，而不是由 Review 或 Bug Fix 线程自行改变架构。
 - 小型修复不强制新开线程；只有主题独立、实验性强，或继续讨论会明显污染主线程时才拆分到 `V2K - Bug Fix` 或 `V2K - Experiment`。
 - 对话负责讨论和交接，正式项目文档与 Git 历史负责保存项目事实。
 
@@ -158,7 +159,7 @@
 ```markdown
 ### YYYY-MM-DD - 简短主题
 
-- 所属线程：V2K - Architecture & Product | Research | Debug | Ideas | Main Development | Local Review | Bug Fix | Experiment
+- 所属线程：V2K - Architecture & Product | Research | Codex Review | Debug | Ideas | Main Development | Bug Fix | Experiment
 - 平台：ChatGPT Web | Codex Desktop | GitHub
 - 引用：对话链接、任务标识、Issue/PR 编号或“不可用”
 - 仓库基线：分支和/或提交 Hash
