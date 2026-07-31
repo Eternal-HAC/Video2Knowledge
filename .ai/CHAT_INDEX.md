@@ -38,7 +38,7 @@
 #### V2K - Codex Review
 
 - 所在平台：ChatGPT Web。
-- 主要职责：独立审查已经发布到 GitHub review branch 或 Pull Request 的真实代码、commit range、完整 diff、测试或 CI 证据、文档同步和提交整洁性；低风险直接 main 流程中，可以审查用户提供的完整 commit 或 diff 材料。
+- 主要职责：接收 `AI_WORKFLOW.md` 规定的 `V2K Web Review Handoff`，独立审查已经发布到 GitHub review branch 或 Pull Request 的真实代码、commit range、完整 diff、测试或 CI 证据、文档同步和提交整洁性；低风险直接 main 流程中，可以审查用户提供的完整 commit 或 diff 材料。
 - 不要处理：不把 Codex 的文字总结当作唯一证据，不声称直接读取尚未发布的本地工作区，不直接修改代码或文档，不创建 commit，不 push review branch 或 main，不 merge，不 tag，也不替用户作最终发布授权。
 - 何时交接：发现具体缺陷时交给 Codex Desktop 的 `V2K - Bug Fix`；发现产品、架构或阶段设计问题时交给 `V2K - Architecture & Product`；需要外部证据时交给 `V2K - Research`；需要隔离试验时交给 Codex Desktop 的 `V2K - Experiment`；Review 通过后由用户决定是否授权 merge 或 push main。
 - 正式记录：Review 证据和结论优先保留在 GitHub Pull Request、review branch、commit 或对应对话索引中；需要长期保留的产品、架构、状态或待办结论，由接收任务的线程写入职责对应的正式项目文档。

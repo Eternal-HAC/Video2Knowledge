@@ -47,6 +47,23 @@ Codex 必须遵守仓库中的 `AGENTS.md`。依赖安装、认证访问、真�
 
 GitHub Issue 和 Pull Request 可以协调工作，但不能替代仓库中的产品、架构、决策、状态和计划文档。GitHub 讨论产生的长期结论，应在合并前或单独阶段写回对应文档。
 
+## 固定仓库信息
+
+Video2Knowledge 的 GitHub 审查与发布目标固定为：
+
+```text
+Repository:
+Eternal-HAC/Video2Knowledge
+
+Repository URL:
+https://github.com/Eternal-HAC/Video2Knowledge
+
+Base branch:
+main
+```
+
+生成阶段完成报告、review branch 发布结果或 Web Review Handoff 时，Codex 应直接使用这些信息，无需用户重复提供。执行任何联网或 Git 写操作前，仍须核对本地 remote、当前分支、HEAD、待发布范围和用户授权；固定信息不能替代执行前安全核验。
+
 ## 项目事实与对话的边界
 
 对话中的结论只有写入对应正式文档或实现提交后，才成为项目事实：
@@ -119,6 +136,18 @@ local main / development state
 - Pull Request 是可选项，只在用户明确要求后创建。
 - 未经用户明确要求，不直接 push 未审查代码到 `origin/main`，不 merge，不 tag。
 
+review branch 与 Pull Request 是两层流程。默认使用 `local commit -> review branch -> Web Review`，不强制每次创建 Pull Request。以下情况优先建议使用 Pull Request：
+
+- 中大型功能。
+- 多提交阶段。
+- 安全边界修改。
+- 网络 Provider。
+- ASR 或 LLM integration。
+- 跨模块改动。
+- 需要长期保留 review 讨论。
+
+小型单提交可以只使用 review branch。创建 Pull Request 仍需用户单独明确授权。
+
 ## 低风险直接 main 例外
 
 极小文档修正、无代码行为变化的修改、明确的小型测试补充，或能够完整提供 diff 的单提交修复，可以在用户明确确认后使用较短路径：
@@ -133,31 +162,182 @@ Local Commit
 
 是否采用例外取决于实际风险和证据完整性。中大型功能，以及涉及网络 Provider、ASR、LLM、权限、安全边界、文件生命周期或跨模块行为的变更，优先使用 review branch 或 Pull Request。
 
-## 阶段完成报告
+## 阶段完成后的固定输出
 
-每个正式阶段完成本地提交后，必须返回：
+每个正式阶段完成本地 commit 和 Codex Self Review 后，必须使用以下格式返回。所有占位内容必须来自真实仓库和实际验证；未执行的验证要明确写“未执行”及原因，不能省略或推测结果。
 
-1. branch。
-2. HEAD。
-3. `origin/main`。
-4. ahead/behind 状态。
-5. commit hash。
-6. commit message。
-7. 修改文件。
-8. 实现摘要。
-9. 验证命令和真实结果。
-10. `git diff --check` 结果。
-11. `git status --short --ignored`。
-12. 已知风险。
-13. 是否建议进入 review branch。
+```markdown
+# V2K Development Completion
+
+## Repository
+
+Repository:
+Eternal-HAC/Video2Knowledge
+
+Repository URL:
+https://github.com/Eternal-HAC/Video2Knowledge
+
+## Git Baseline
+
+Branch:
+<current branch>
+
+HEAD:
+<commit hash>
+
+Base:
+origin/main <hash>
+
+Status:
+<ahead / behind>
+
+## Stage
+
+Stage:
+<stage name>
+
+Objective:
+<one sentence>
+
+## Commits
+
+<按时间从旧到新列出本阶段的 hash 和 message>
+
+## Changed Files
+
+<列出实际修改文件>
+
+## Implementation Summary
+
+<只总结实际完成内容，不把未实现能力描述为已实现>
+
+## Explicitly Not Changed
+
+<按实际阶段列出明确未处理的内容，例如 CLI、pipeline、real-fallback、network、media download、LLM、cache>
+
+## Validation
+
+<列出真实执行的 unittest、targeted tests、Mock CLI、git diff --check 和其他已获批准的验证及结果>
+
+## Git Status
+
+git status -sb
+<真实输出>
+
+git status --short --ignored
+<真实输出>
+
+## Known Risks
+
+<只记录有证据的已知风险；没有时写 None>
+
+## Approval State
+
+- local commit complete
+- review branch NOT published unless separately approved
+- main NOT pushed
+- PR NOT created
+- tag NOT created
+```
+
+如果某项已经在本阶段获得单独授权并实际执行，应按事实更新 `Approval State`，不能继续保留与真实状态冲突的默认文字。
+
+## Review branch 发布后的固定 Web Handoff
+
+用户明确授权创建并 push review branch 后，Codex 必须返回以下标准 handoff。已知精确 hash 时必须填写 base commit 和 head commit；没有创建 Pull Request 时，PR URL 写“未创建”。
+
+```markdown
+# V2K Web Review Handoff
+
+## Repository
+
+Repository:
+Eternal-HAC/Video2Knowledge
+
+Repository URL:
+https://github.com/Eternal-HAC/Video2Knowledge
+
+## Review Target
+
+Base:
+main
+
+Review branch:
+<review branch>
+
+Review range:
+main...<review branch>
+
+Base commit:
+<hash>
+
+Head commit:
+<hash>
+
+## GitHub Review Instruction
+
+请通过已连接的 GitHub 仓库执行真实代码审查。
+
+Repository:
+Eternal-HAC/Video2Knowledge
+
+Repository URL:
+https://github.com/Eternal-HAC/Video2Knowledge
+
+Base:
+main
+
+Review branch:
+<review branch>
+
+Review range:
+main...<review branch>
+
+请直接检查 GitHub 上的真实：
+
+- commits
+- diff
+- source code
+- tests
+- documentation
+
+不要只依据 Codex 的摘要。
+
+重点审查：
+
+1. 阶段目标是否真正实现。
+2. 是否超出范围。
+3. 架构一致性。
+4. 安全边界。
+5. 错误处理。
+6. 测试证据。
+7. 文档同步。
+8. 是否适合 merge 到 main。
+
+最终给出：
+
+A. 可以 merge
+B. 需要 Bug Fix
+C. 需要 Architecture & Product 重新决策
+D. 证据不足
+
+## Published State
+
+- remote review branch: <remote branch>
+- branch HEAD: <hash>
+- relative base commit: <hash>
+- PR URL: <URL 或未创建>
+- main 是否保持不变: <真实结果>
+```
+
+handoff 只能在 review branch 实际发布成功后使用。若 push、认证或网络失败，应返回真实失败状态，不能生成暗示 GitHub 已可审查的 handoff。
 
 ## Web Review 后的交接
 
-- 发现具体缺陷：交给 Codex Desktop 的 `V2K - Bug Fix`。
-- 发现产品、架构或阶段设计问题：停止修改，交给 Web 的 `V2K - Architecture & Product`。
-- 需要隔离试验或 benchmark：交给 Codex Desktop 的 `V2K - Experiment`。
-- 需要外部证据：交给 Web 的 `V2K - Research`。
-- Review 通过：等待用户明确授权 merge 或 push main。
+- A. 可以 merge：等待用户明确授权 merge 或 push main。
+- B. 需要 Bug Fix：交给 Codex Desktop 的 `V2K - Bug Fix`；修复、本地验证、commit 和 Codex Self Review 完成后，经用户授权更新同一 review branch，再交回 Web Review。
+- C. 需要 Architecture & Product 重新决策：停止修改，交给 Web 的 `V2K - Architecture & Product`。
+- D. 证据不足：先明确缺失证据；需要本地仓库证据时交给对应 Codex Desktop 线程补充，需要外部资料时交给 Web 的 `V2K - Research`，需要隔离验证时交给 Codex Desktop 的 `V2K - Experiment`。
 
 ## 可复用任务编排 Skill
 
