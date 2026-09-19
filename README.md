@@ -146,7 +146,7 @@ Audio acquisition, media download, and retained audio cache require explicit use
 python -m unittest discover -s tests
 ```
 
-Current test baseline: `120` tests. The current Windows environment skips one
+Current test baseline: `206` tests. The current Windows environment skips one
 platform-dependent symlink test when symlink creation is unavailable.
 
 ## Installation
@@ -184,7 +184,9 @@ Generated notes contain YAML Frontmatter and these sections:
 - 可执行事项
 - 原始转录（带时间戳）
 
-`raw_metadata` is retained in memory for provider debugging and extension but is not rendered into Markdown Frontmatter or body content.
+For yt-dlp metadata, `raw_metadata` retains only the minimal in-memory provider
+and official-subtitle mapping required by the official subtitle provider. It is
+not rendered into Markdown Frontmatter or body content.
 
 ## Repository
 
