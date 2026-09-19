@@ -526,3 +526,286 @@ Base installation remains lightweight, while `.[asr]` installs the validated Pyt
 
 Follow-up Review:
 Re-evaluate the exact pin after newer faster-whisper versions are tested, and design formal model acquisition and cache lifecycle separately from dependency packaging.
+
+## 2026-09-18
+
+Decision:
+Constrain every provider-supplied subtitle URL (including redirect targets) to
+an offline trust policy before any network callable: HTTPS-only, required
+hostname, no userinfo, port empty or `443`, and literal IPs rejected when
+loopback, private, link-local, multicast, reserved, or unspecified. Responses
+are bounded to 16 MiB, and charset, decode, URL, size, and network failures
+surface only as stable sanitized public errors without underlying exception
+causes.
+
+Reason:
+
+Provider metadata and subtitle URLs arrive from third parties (yt-dlp) and may
+carry signed credentials, while redirect and response handling historically
+trusted whatever the server returned. Future audio acquisition, transcript API
+fallback, and any additional fetch boundary will face the same classes of
+input, so the trust rules must be fixed now rather than renegotiated per
+provider.
+
+Alternatives:
+
+Validate only the initial URL and trust default redirect handling, rely on
+Content-Length alone for size limits, keep `errors="replace"` decoding, or
+continue embedding underlying exceptions in public errors for debuggability.
+
+Impact:
+
+`app/transcript.fetch_text` validates initial and redirect URLs with the same
+validator, reads at most `MAX_SUBTITLE_RESPONSE_BYTES + 1` bytes, and maps
+failures to stable categories (`unsafe URL`, `response too large`,
+`unsupported or invalid subtitle encoding`, HTTP status, timeout, network
+failure). `app.platform_adapter` classifies hosts exactly, and
+`app.downloader` keeps only minimal subtitle metadata and a single stable
+extraction error. DNS hostnames pass without resolution, so DNS rebinding is
+not claimed to be prevented; future fetch boundaries must reuse or tighten
+this policy instead of bypassing it.
+
+Follow-up Review:
+Revisit when transcript API fallback or real audio acquisition is approved, or
+if a future provider legitimately requires a scheme, port, or metadata field
+outside this policy.
+
+## 2026-09-19
+
+### Provider Boundary Remediation Decisions
+
+Decision:
+Close the independently reviewed gaps in the `v0.5.x` provider input and
+error boundary hardening before any further stage: redirect response handling
+must be bounded and closed, legacy numeric IPv4 literals must fail closed,
+`youtu.be` matches its exact host only, reserved platform ids can never be
+granted through hostname collision, minimal subtitle metadata accepts string
+values only, and yt-dlp must never write raw output to process streams before
+the sanitized error boundary.
+
+Rationale:
+
+The standard library redirect dispatch drains redirect bodies with an
+unbounded `fp.read()` and leaves responses unclosed on rejected targets, which
+voids the 16 MiB subtitle bound and leaks connections. Host validators that
+only understand modern IP literals accept legacy numeric IPv4 forms the
+operating system resolves as loopback. Hostname-derived platform labels can
+collide with reserved provider ids, and allowlist key filtering alone still
+passes nested mutable provider objects by reference. yt-dlp writes diagnostics
+directly to stderr unless a logger is injected, so exception-chain cleanup
+alone cannot sanitize output that was already printed.
+
+Alternatives:
+
+Trust the standard library redirect drain, resolve hosts through DNS to
+classify them, keep reference-based allowlist copying for debuggability, or
+allow reserved-id hostnames to keep their label and gate only on exact
+capability checks. Each alternative either breaks the offline requirement or
+reopens a demonstrated bypass.
+
+Impact:
+
+`app/transcript` overrides `http_error_30x` (301/302/303/307/308) to read
+redirect bodies through the same 16 MiB cap, maps oversized redirect bodies
+to the stable `response too large` error, and closes the current response on
+safe, unsafe, oversized, and parent-opener-failure paths. The URL validator
+recognizes legacy numeric IPv4 forms via `socket.inet_aton` without DNS,
+applies the same loopback/private/link-local/multicast/reserved/unspecified
+rejection rules, and fails closed on numeric-looking hosts that cannot be
+proven safe; the same validator covers initial URLs and redirect targets.
+`app/platform_adapter` treats `youtu.be` as exact-host only and maps reserved
+platform id collisions to the safe `unknown` label. `app/downloader` copies
+only string allowlist values into fresh containers and injects a
+module-private quiet logger through `ydl_opts["logger"]`. All evidence is
+offline; DNS rebinding remains out of scope and no live provider validation
+was performed.
+
+Follow-up Review:
+Revisit when transcript API fallback or real audio acquisition is approved,
+or if `socket.inet_aton` legacy parsing diverges on a new supported platform.
+
+## 2026-09-19
+
+### Request Authority Normalization Decision
+
+Decision:
+The subtitle URL validator validates the hostname the HTTP request layer would
+actually use, not the raw `urlparse` result. The authority is normalized
+offline before any IP or hostname rule runs: percent encoding inside the
+authority is rejected instead of decoded, trailing DNS root dots are removed,
+and the host must survive an explicit IDNA to ASCII conversion that fails
+closed. The same validator covers initial URLs and every redirect target, and
+the HTTP error path closes its own response without reading it.
+
+Rationale:
+
+`urllib.request.Request` applies `unquote()` to the raw authority, so
+`https://127%2e0%2e0%2e1/sub.vtt` reached the socket layer as `127.0.0.1`
+while `urlparse(...).hostname` still reported the encoded string and passed
+the previous checks. Platform resolvers additionally drop a trailing root dot
+and apply IDNA, so `https://127.0.0.1./`, `https://127.1./`, and the
+full-width/ideographic forms (`１２７.０.０.１`, `127。0。0。1`) reached loopback
+on this platform while the validator accepted them. The standard library also
+quotes the raw `Location` with latin-1 before `redirect_request` runs, so a
+non-latin-1 redirect target failed as a raw encoding error rather than the
+stable rejection. Separately, the HTTP status error path converted the error
+but never closed the response object it was handed.
+
+Alternatives:
+
+Decode the authority with `unquote()` and validate the decoded value, run the
+whole URL through a canonicalization layer, resolve the host through DNS to
+classify it, or keep validating `urlparse` output and rely on the request
+layer to agree. Decoding accepts an authority whose decoded and literal forms
+can disagree about host and port; full URL canonicalization is a broader
+framework than this boundary needs; DNS resolution breaks the offline
+requirement and introduces rebinding exposure.
+
+Impact:
+
+`app/transcript` normalizes the authority in `_normalized_request_host` before
+`_is_safe_subtitle_host` applies the literal-IP, legacy-numeric, and
+numeric-looking fail-closed rules. Percent encoding in the path and query
+(where signed subtitle URLs carry their signature) is untouched. The redirect
+handler resolves the raw `Location` into the effective absolute target before
+dispatch and validates the absolute target once more, so a redirect target is
+checked without a second request. The HTTP error path reads the status code
+first, closes the response with a swallowed close failure, and raises the same
+stable sanitized error. All evidence is offline unit tests; no live provider
+validation was performed; DNS rebinding and resolver-level divergence remain
+outside the current capability.
+
+Follow-up Review:
+Revisit when transcript API fallback or real audio acquisition is approved, or
+if a supported platform resolves an authority differently from IDNA.
+
+### Reserved Namespace, Control Character, and Redirect Resolution Decision
+
+Decision:
+Three gaps left in the request-authority normalization above are closed in the
+same validator, and the redirect rule is restated as a resolution rule.
+
+1. The reserved `localhost` namespace is rejected after IDNA normalization and
+   trailing-dot removal: `localhost`, `localhost.`, every `*.localhost`
+   subdomain, and every full-width, upper-case, or port-qualified spelling that
+   normalizes onto them.
+2. An authority that contains an ASCII control character or DEL fails closed,
+   and `_ip_literal_address` converts the `ValueError` and `OSError` that
+   `socket.inet_aton` can raise into "not a usable numeric form" instead of
+   letting them escape.
+3. A redirect is validated as the effective absolute target: the raw
+   `Location` is parsed, given a `/` path when it is authority-only,
+   re-serialized, percent-encoded with latin-1, and `urljoin`-ed against the
+   URL of the request being redirected — exactly what `urllib.request` does —
+   and that resolved target is what the safety rules judge. `redirect_request`
+   keeps a second validation of the absolute target the standard library
+   itself computed.
+4. A quote, encoding, or resolution failure during that step is converted
+   inside the handler into `TranscriptProviderError("official subtitle VTT
+   fetch failed: unsafe URL")` with `from None`. No raw `UnicodeError` crosses
+   the handler.
+
+Rationale:
+
+`localhost` is not an IP literal, so the literal rules never saw it, yet the
+whole namespace resolves to loopback without any lookup of ours; the full-width
+and upper-case spellings normalize onto the same name. IDNA's ASCII fast path
+returns already-ASCII labels without running nameprep, so
+`https://example.com\x00.evil/sub.vtt` survived normalization intact and
+`socket.inet_aton` raised `ValueError("embedded null character")` from inside
+the validator, which sits outside the `fetch_text` conversion block and so
+reached the caller as a raw exception. Validating the raw `Location` as if it
+were an absolute URL rejected legal relative and scheme-relative redirects
+(`/next.vtt`, `../next.vtt`, `?sig=abc`, `//cdn.example.com/next.vtt`) that
+resolve to a safe public HTTPS target, and non-latin-1 targets failed as a raw
+`UnicodeEncodeError` rather than the documented stable error.
+
+Alternatives:
+
+Resolve `localhost` through DNS, keep a hard-coded name list per platform, or
+treat it as a special case only in the resolver. Resolve the redirect target by
+calling the standard library's own handler and intercepting the result. Keep
+raising the raw `UnicodeError` and document that instead of the stable error.
+DNS resolution breaks the offline requirement and reintroduces rebinding;
+intercepting the handler would run the dispatch that must not run for a
+rejected target; the existing contract, tests, and documentation all already
+published the stable `unsafe URL` error, so the raw exception was the outlier.
+
+Impact:
+
+`app/transcript` adds `_has_control_characters` and `_is_localhost_namespace`
+checks to the normalization and host gates, `_ip_literal_address` catches
+`(OSError, ValueError)`, `_is_safe_subtitle_url` fails closed on any unexpected
+parse failure, and `_effective_redirect_target` mirrors the request layer's
+resolution before `http_error_30x` validates it. Rejected redirects still call
+no parent opener, read no body, and close the response. All evidence is offline
+unit tests through `fetch_text` and the real `http_error_30x` dispatch; no live
+provider validation was performed, DNS rebinding and resolver-level time-of-
+check/time-of-use differences remain outside the current capability, and this
+is not a complete SSRF defense.
+
+Follow-up Review:
+Revisit if a supported platform resolves the `localhost` namespace differently,
+or if control characters ever become legal in an authority.
+
+### Raw Input Check and Redirect Cleanup Precedence Decision
+
+Decision:
+The control-character rule above is applied to the raw input rather than only to
+the parsed authority, and redirect-response cleanup is made best-effort.
+
+1. The unstripped initial URL and the unstripped raw redirect `Location` are
+   checked for ASCII control characters and DEL before any `urlparse`, `quote`,
+   or `urljoin` runs. A hit fails closed with the stable
+   `official subtitle VTT fetch failed: unsafe URL`. Percent encoding in the
+   path and query remains legal and unaffected.
+2. Redirect cleanup goes through one module-internal best-effort close helper,
+   used by the `http_error_30x` `finally`, by `_BoundedRedirectBody.close`, and
+   by the HTTP status error path. An ordinary exception from `close()` is
+   swallowed so it cannot replace a propagating stable error, a parent-opener
+   failure, a successful redirect result, or a control-flow exception, and the
+   close text never reaches a public error or a traceback. `KeyboardInterrupt`
+   and `SystemExit` from `close()` still propagate unchanged.
+
+Rationale:
+
+`urlparse` removes tab, CR, and LF from the whole URL before it splits the
+authority off, so the previous authority-level rule never saw those three and
+`https://exa\tmple.com/sub.vtt`, `https://exa\rmple.com/sub.vtt`, and
+`https://exa\nmple.com/sub.vtt` reached the request layer as `example.com`. The
+check therefore has to run on the unstripped string, exactly as the NUL and DEL
+cases already had to. Separately, `finally: bounded_body.close()` gave an
+ordinary close failure the power to replace the exception — or the return value
+— it was running alongside: the stable `unsafe URL` and `response too large`
+errors, a `URLError` raised by the parent opener, a successful redirect result,
+and `KeyboardInterrupt`/`SystemExit` all became `RuntimeError: raw close
+failure`. Cleanup is not an outcome, so it must not be able to become one.
+
+Alternatives:
+
+Keep the authority-level rule and document the tab/CR/LF tolerance as accepted
+behaviour, or strip those characters before validating. Keep `finally: close()`
+and accept that a failing close overrides the outcome, or catch `BaseException`
+around it. Documenting the tolerance contradicts the fail-closed contract the
+tests and documents already publish; stripping would reproduce `urlparse`'s own
+silent rewrite, which is the behaviour that hides the smuggling vector.
+Catching `BaseException` would swallow `KeyboardInterrupt` and `SystemExit`,
+which the contract requires to propagate unchanged.
+
+Impact:
+
+`app/transcript` adds `_raw_url_is_usable` and calls it from
+`_is_safe_subtitle_url` and from `http_error_302` before the raw `Location` is
+resolved, and replaces `_close_error_response` with `_close_response_quietly`
+so the redirect and HTTP-error close policies are literally the same policy.
+Rejected raw values still call no opener, read no redirect body, call no parent
+opener, and close the response. All evidence is offline unit tests through
+`fetch_text` and the real `http_error_30x` dispatch; no live provider validation
+was performed, DNS rebinding and resolver-level time-of-check/time-of-use
+differences remain outside the current capability, and this is not a complete
+SSRF defense.
+
+Follow-up Review:
+Revisit if a provider ever legitimately returns a `Location` containing a raw
+control character, or if the bounded redirect body gains a caller that depends
+on a failing close being visible.

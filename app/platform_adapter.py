@@ -6,10 +6,32 @@ No real platform API or downloader is called here.
 
 from __future__ import annotations
 
-from pathlib import Path
 from urllib.parse import urlparse
 
 from app.models import PlatformCapabilities, VideoSource
+
+_SUPPORTED_HOST_DOMAINS = {
+    "youtube.com": "youtube",
+    "youtu.be": "youtube",
+    "bilibili.com": "bilibili",
+    "tiktok.com": "tiktok",
+    "vimeo.com": "vimeo",
+    "coursera.org": "coursera",
+    "udemy.com": "udemy",
+}
+_EXACT_ONLY_HOST_DOMAINS = frozenset({"youtu.be"})
+_RESERVED_PLATFORM_LABELS = frozenset(
+    {
+        "youtube",
+        "bilibili",
+        "tiktok",
+        "vimeo",
+        "coursera",
+        "udemy",
+        "local",
+        "unknown",
+    }
+)
 
 
 def resolve_video_source(raw_input: str) -> VideoSource:
@@ -20,7 +42,7 @@ def resolve_video_source(raw_input: str) -> VideoSource:
         return VideoSource(
             raw_input=raw_input,
             source_type="url",
-            platform=_platform_from_host(parsed.netloc),
+            platform=_platform_from_url(parsed),
         )
 
     return VideoSource(
@@ -75,20 +97,32 @@ def get_platform_capabilities(platform: str) -> PlatformCapabilities:
     )
 
 
-def _platform_from_host(host: str) -> str:
-    normalized = host.lower()
-    if "youtube.com" in normalized or "youtu.be" in normalized:
-        return "youtube"
-    if "bilibili.com" in normalized:
-        return "bilibili"
-    if "tiktok.com" in normalized:
-        return "tiktok"
-    if "vimeo.com" in normalized:
-        return "vimeo"
-    if "coursera.org" in normalized:
-        return "coursera"
-    if "udemy.com" in normalized:
-        return "udemy"
-    if normalized:
-        return normalized
-    return Path(host).name or "unknown"
+def _platform_from_url(parsed) -> str:
+    """Map a parsed URL to a platform label using exact hostname matching."""
+
+    try:
+        host = parsed.hostname
+    except ValueError:
+        host = None
+    normalized = host.lower().rstrip(".") if host else ""
+    if parsed.username is not None or parsed.password is not None:
+        return _safe_platform_label(normalized)
+    if not normalized:
+        return "unknown"
+    for domain, platform in _SUPPORTED_HOST_DOMAINS.items():
+        if normalized == domain:
+            return platform
+        if (
+            domain not in _EXACT_ONLY_HOST_DOMAINS
+            and normalized.endswith("." + domain)
+        ):
+            return platform
+    return _safe_platform_label(normalized)
+
+
+def _safe_platform_label(normalized_host: str) -> str:
+    """Return a label that never collides with a reserved platform id."""
+
+    if not normalized_host or normalized_host in _RESERVED_PLATFORM_LABELS:
+        return "unknown"
+    return normalized_host

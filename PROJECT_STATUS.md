@@ -496,3 +496,267 @@ Remaining boundaries:
 - Retained cache, detected-language contract, pure-silence semantics,
   half-millisecond timestamp rules, GPU/CUDA, VAD, batch mode, formal model
   cache lifecycle, and LLM knowledge extraction remain incomplete.
+
+## 2026-09-18
+
+Status: `v0.5.x Provider Input and Error Boundary Hardening` implementation
+complete.
+
+Changes:
+
+- Replaced platform domain substring matching with exact hostname matching
+  (`urlparse(...).hostname`, lowercase, trailing-dot stripping, userinfo and
+  empty-host rejection). Suffix-confusion hosts such as `notyoutube.com` and
+  `youtube.com.evil.test` are no longer misclassified as YouTube.
+- Mapped yt-dlp metadata extraction failures to the stable
+  `yt-dlp metadata extraction failed` error without underlying exception text
+  or cause. Missing-dependency and metadata shape errors remain separate.
+- Minimized `VideoMetadata.raw_metadata` to
+  `{"provider": "yt-dlp", "subtitles": {...}}` with a per-track allowlist of
+  `url`, `ext`, `protocol`, and `format`.
+- Added offline subtitle URL validation (HTTPS-only, hostname required, no
+  userinfo, port empty or `443`, restricted literal IPs rejected via
+  `ipaddress`) before any network callable, and applied the same validation to
+  redirect targets through a custom `HTTPRedirectHandler`.
+- Bounded subtitle response reads to 16 MiB (`MAX_SUBTITLE_RESPONSE_BYTES`)
+  with pre-read `Content-Length` rejection and `limit + 1` body reads.
+- Mapped unknown charsets, charset lookup failures, and decode failures to a
+  stable encoding error, removed underlying exception causes from all public
+  subtitle fetch errors, and preserved `KeyboardInterrupt` and `SystemExit`.
+
+Validation:
+
+- New offline security regression suite passed: 36 tests in
+  `tests/test_provider_security.py`.
+- Full unit tests passed: 156 tests, with the same one pre-existing Windows
+  symlink-escape test skipped because symlink creation is unavailable in this
+  environment.
+- Mock CLI regression passed with the default Mock providers.
+- No network access, real YouTube, real yt-dlp, real subtitle fetch, real
+  ffmpeg, real faster-whisper, media download, or dependency change occurred.
+
+Remaining boundaries:
+
+- CLI command surface, fallback eligibility, provider ids, and
+  `attempted_providers` behavior are unchanged.
+- Local ASR CLI, default `real-fallback` real ASR, YouTube live audio
+  acquisition, retained cache, model cache policy, YAML Frontmatter
+  hardening, template packaging/path hardening, exporter overwrite policy,
+  and LLM extraction remain incomplete.
+
+## 2026-09-19
+
+Status: `v0.5.x Provider Boundary Remediation and Acceptance` implementation
+complete, pending independent re-review.
+
+Changes:
+
+- Replaced the standard library's unbounded redirect-body drain with a
+  bounded read of at most `MAX_SUBTITLE_RESPONSE_BYTES + 1` in a custom
+  `http_error_30x` override; 301, 302, 303, 307, and 308 share one policy.
+  Oversized redirect bodies map to the stable `response too large` error, the
+  current response is closed on safe, unsafe, oversized, and
+  parent-opener-failure paths, and redirect rejection errors never expose the
+  `Location` URL, query, userinfo, headers, or body.
+- Extended the subtitle URL validator with offline legacy numeric IPv4
+  recognition (`socket.inet_aton`) so forms such as `127.1`, `2130706433`,
+  and `0x7f000001` are rejected under the same loopback/private rules;
+  numeric-looking hosts that cannot be proven safe fail closed. The identical
+  validator covers initial URLs and redirect targets.
+- Made `youtu.be` exact-host only so no `*.youtu.be` subdomain gains YouTube
+  capabilities, and mapped unknown hostnames colliding with reserved platform
+  ids (for example `https://youtube/x` or `https://user@youtube/x`) to the
+  safe `unknown` label with no provider capabilities.
+- Restricted minimal subtitle metadata to string values only for the
+  `url`/`ext`/`protocol`/`format` allowlist, dropping nested dict/list values
+  and any shared references with provider-owned objects.
+- Injected a module-private quiet logger through `ydl_opts["logger"]` so raw
+  yt-dlp output cannot reach stdout/stderr before the sanitized extraction
+  error.
+
+Validation:
+
+- `tests/test_provider_security.py` grew from 36 to 50 fully offline tests,
+  including real redirect handler dispatch coverage.
+- Full unit test suite passes with one pre-existing Windows symlink-escape
+  skip; Mock CLI regression passed; `compileall` passed.
+- No network access, real YouTube, real yt-dlp, real subtitle fetch, real
+  ffmpeg, real faster-whisper, media download, or dependency change occurred.
+
+Remaining boundaries:
+
+- DNS rebinding remains out of scope and unresolved.
+- Real network provider behavior remains unverified; all evidence is mocked
+  or offline probes.
+- CLI command surface, fallback eligibility, provider ids, and
+  `attempted_providers` behavior are unchanged.
+
+## 2026-09-19 Provider Authority Normalization Remediation
+
+An independent review rejected the previous completion claim because the
+subtitle URL validator inspected `urlparse(...).hostname` while the HTTP
+request layer normalizes the authority further. The gap was reproduced
+offline, fixed, and covered by new offline tests.
+
+What changed:
+
+- The validator now validates the hostname the request layer would actually
+  use. `_normalized_request_host` rejects any percent encoding inside the
+  authority instead of decoding it, drops trailing DNS root dots, and
+  requires the host to survive an explicit IDNA to ASCII conversion, failing
+  closed when it cannot. Percent encoding in the path and query (where signed
+  subtitle URLs carry their signature) is unaffected.
+- The literal-IP, legacy numeric IPv4, and numeric-looking fail-closed rules
+  now run on that normalized host, so `https://127%2e0%2e0%2e1/`,
+  `https://%31%32%37.0.0.1/`, `https://127.0.0.1./`, `https://127.1./`,
+  `https://2130706433./`, `https://127。0。0。1/`, and `https://１２７.０.０.１/`
+  are all rejected before any network callable, while ordinary DNS hostnames,
+  public IPv4/IPv6 literals, and a trailing root dot on a real name still work.
+- Initial URLs and redirect targets share the one validator. The redirect
+  handler also validates the raw `Location` before the standard library
+  quotes it with latin-1, so a raw target that is already an unsafe absolute
+  URL, or that is not an absolute HTTPS URL at all, is rejected before the
+  parent opener is reached and before its body is read. This holds for 301,
+  302, 303, 307, and 308. (Relative targets were over-rejected and a
+  non-latin-1 absolute target still failed as a raw `UnicodeError`; both are
+  corrected in the entry below.)
+- The HTTP status error path reads the status code, closes the error response
+  without reading the body, and swallows a failing close so it cannot replace
+  the stable `official subtitle VTT fetch failed: HTTP Error <status>` error.
+  No URL, header, body, or underlying exception is exposed, and
+  `KeyboardInterrupt` and `SystemExit` still propagate unchanged.
+
+Validation:
+
+- `tests/test_provider_security.py` grew from 50 to 64 fully offline tests.
+- Full unit test suite: 184 tests executed, 183 passed, and one pre-existing
+  Windows symlink-escape test was skipped; Mock CLI regression passed; `compileall` passed;
+  `git diff --check` passed.
+- No network access, real YouTube, real yt-dlp, real subtitle fetch, real
+  ffmpeg, real faster-whisper, media download, or dependency change occurred.
+
+Remaining boundaries:
+
+- DNS rebinding and resolver-level differences remain out of scope.
+- Real network provider behavior remains unverified; every statement above is
+  backed by offline tests only, and this is not a complete SSRF defense.
+- CLI command surface, fallback eligibility, provider ids, and
+  `attempted_providers` behavior are unchanged.
+
+## 2026-09-19 Provider Boundary Finalization
+
+An independent review rejected the previous completion claim again, leaving
+four findings in the same boundary. All four were reproduced offline first,
+then fixed, with every earlier change kept in place.
+
+What changed:
+
+- The reserved `localhost` namespace is rejected after IDNA normalization and
+  trailing-dot removal, for initial URLs and redirect targets alike:
+  `https://localhost/`, `https://localhost./`, `https://x.localhost/`,
+  `https://a.b.localhost/`, and the full-width (`ｌｏｃａｌｈｏｓｔ`) and
+  upper-case spellings that normalize onto them no longer reach the opener.
+  Names that merely contain the label (`localhost.example.com`,
+  `notlocalhost.example.com`) still work.
+- An authority containing an ASCII control character or DEL fails closed.
+  Before the fix, `https://example.com\x00.evil/sub.vtt` passed IDNA's ASCII
+  fast path unchanged and `socket.inet_aton` raised
+  `ValueError("embedded null character")` from inside the validator, which
+  runs outside the `fetch_text` conversion block. `_ip_literal_address` now
+  maps the expected `ValueError` and `OSError` to a safe validation failure,
+  the validator fails closed on any unexpected parse failure, and
+  `KeyboardInterrupt`/`SystemExit` still propagate unchanged. (The rule as
+  written here applied to the *parsed* authority only, which left raw tab, CR,
+  and LF in the URL string itself; the section below closes that gap.)
+- Redirect targets are validated as the effective absolute target: the raw
+  `Location` is parsed, given a `/` path when authority-only, re-serialized,
+  percent-encoded with latin-1, and `urljoin`-ed against the source request
+  URL exactly as `urllib.request` does. Safe relative (`/next.vtt`,
+  `../next.vtt`, `next.vtt`, `?sig=abc`) and scheme-relative
+  (`//cdn.example.com/next.vtt`, `//8.8.8.8/next.vtt`) redirects from an HTTPS
+  source are accepted again, while `//127.0.0.1/next.vtt`,
+  `//127.1/next.vtt`, `//localhost/next.vtt`, `//x.localhost/next.vtt`,
+  encoded authorities, `http`/`file`/`ftp`/`data` targets, userinfo, and
+  non-`443` ports stay rejected. `redirect_request` keeps its second
+  validation of the absolute target.
+- A redirect target that cannot be quoted, encoded, or resolved now maps to
+  `official subtitle VTT fetch failed: unsafe URL` inside the handler instead
+  of raising a raw `UnicodeError`. Rejected redirects call no parent opener,
+  read no body, and close the response; safe ones still perform the bounded
+  16 MiB redirect read and call the parent exactly once.
+
+Validation:
+
+- `tests/test_provider_security.py` grew from 64 to 76 fully offline tests,
+  all driven through `fetch_text` or the real `http_error_30x` dispatch.
+- Full unit test suite: 196 tests executed, 195 passed, and one pre-existing
+  Windows symlink-escape test was skipped; Mock CLI regression passed; `compileall` passed;
+  `git diff --check` passed.
+- No network access, DNS lookup, real YouTube, real yt-dlp, real subtitle
+  fetch, real ffmpeg, real faster-whisper, media download, or dependency
+  change occurred.
+
+Remaining boundaries:
+
+- DNS rebinding and resolver-level time-of-check/time-of-use differences remain
+  out of scope, and this is not a complete SSRF defense.
+- Real network provider behavior remains unverified; every statement above is
+  backed by offline tests only.
+- CLI command surface, fallback eligibility, provider ids, and
+  `attempted_providers` behavior are unchanged.
+
+## 2026-09-19 Provider Boundary Closure
+
+An independent review rejected the Finalization completion claim as well,
+leaving two runtime findings and one documentation number. Both findings were
+reproduced offline first, then fixed, with every earlier change kept in place.
+
+What changed:
+
+- Raw control characters now fail closed *before* any parsing, for the initial
+  URL and for the raw redirect `Location` alike. `urlparse` removes tab, CR,
+  and LF from the whole URL before it splits the authority off, so the
+  authority-level rule added by the previous round never saw those three:
+  `https://exa\tmple.com/sub.vtt` and its CR and LF variants all reached the
+  mocked opener. Any ASCII control character or DEL anywhere in the raw string
+  — authority, path, or query — is now refused with the stable
+  `official subtitle VTT fetch failed: unsafe URL`, without calling the
+  opener, reading a redirect body, or calling the parent opener. Legal percent
+  encoding in the path and query is untouched.
+- Redirect cleanup is now best-effort. The `finally: bounded_body.close()` in
+  the redirect handler let an ordinary `close()` failure replace whatever it
+  ran alongside: the stable `unsafe URL` and `response too large` errors, a
+  `URLError`/platform/network failure from the parent opener, a successful
+  redirect result, and a propagating `KeyboardInterrupt`/`SystemExit`. One
+  module-internal helper now swallows ordinary close failures at the redirect
+  cleanup site, inside `_BoundedRedirectBody.close`, and on the HTTP status
+  error path, so the HTTPError and redirect policies are literally the same
+  policy. Cleanup is idempotent because the standard library closes a
+  successfully followed redirect response itself; `KeyboardInterrupt` and
+  `SystemExit` raised by `close()` still propagate unchanged, and close text
+  never reaches a public error or a traceback.
+
+Validation:
+
+- `tests/test_provider_security.py` grew from 76 to 86 fully offline tests, all
+  driven through `fetch_text` or the real `http_error_30x` dispatch.
+- Red phase recorded before any runtime edit: `Ran 86 tests` /
+  `FAILED (failures=53, errors=21)` from eight methods — seven of the ten new
+  ones plus the rewritten whitespace-tolerance test. The two new methods that
+  passed before the fix guard it against catching `BaseException` around
+  cleanup.
+- Full unit test suite: 206 tests executed, 205 passed, 1 skipped (the
+  pre-existing Windows symlink-escape case); Mock CLI regression passed;
+  `compileall` passed; `git diff --check` passed.
+- No network access, DNS lookup, real YouTube, real yt-dlp, real subtitle
+  fetch, real ffmpeg, real faster-whisper, media download, or dependency
+  change occurred.
+
+Remaining boundaries:
+
+- DNS rebinding and resolver-level time-of-check/time-of-use differences remain
+  out of scope, and this is not a complete SSRF defense.
+- Real network provider behavior remains unverified; every statement above is
+  backed by offline tests only.
+- CLI command surface, fallback eligibility, provider ids, and
+  `attempted_providers` behavior are unchanged.

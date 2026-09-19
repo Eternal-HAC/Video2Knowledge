@@ -29,6 +29,19 @@ class MockMetadataProvider:
         return get_mock_metadata(source.raw_input, platform=source.platform)
 
 
+class _YtdlpQuietLogger:
+    """Module-private logger so raw yt-dlp output never reaches stdout/stderr."""
+
+    def debug(self, msg: object) -> None:
+        pass
+
+    def warning(self, msg: object) -> None:
+        pass
+
+    def error(self, msg: object) -> None:
+        pass
+
+
 class YtDlpMetadataProvider:
     name = "yt-dlp"
 
@@ -51,14 +64,17 @@ class YtDlpMetadataProvider:
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
+            "logger": _YtdlpQuietLogger(),
         }
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(source.raw_input, download=False)
                 sanitized = ydl.sanitize_info(info)
-        except Exception as error:
-            raise MetadataProviderError(f"yt-dlp metadata extraction failed: {error}") from error
+        except Exception:
+            raise MetadataProviderError(
+                "yt-dlp metadata extraction failed"
+            ) from None
 
         if not isinstance(sanitized, dict):
             raise MetadataProviderError("yt-dlp returned metadata in an unexpected shape.")
@@ -172,8 +188,42 @@ def _metadata_from_ytdlp_info(
         canonical_url=canonical_url,
         thumbnail_url=_string_value(info.get("thumbnail")),
         description=_string_value(info.get("description")),
-        raw_metadata=info,
+        raw_metadata=_minimal_provider_metadata(info),
     )
+
+
+_MINIMAL_SUBTITLE_TRACK_FIELDS = ("url", "ext", "protocol", "format")
+
+
+def _minimal_provider_metadata(info: dict[str, object]) -> dict[str, object]:
+    """Keep only the minimal provider metadata the subtitle provider needs."""
+
+    return {
+        "provider": "yt-dlp",
+        "subtitles": _minimal_subtitle_mapping(info.get("subtitles")),
+    }
+
+
+def _minimal_subtitle_mapping(value: object) -> dict[str, list[dict[str, object]]]:
+    if not isinstance(value, dict):
+        return {}
+    minimal: dict[str, list[dict[str, object]]] = {}
+    for language, tracks in value.items():
+        if not isinstance(language, str) or not isinstance(tracks, list):
+            continue
+        minimal_tracks: list[dict[str, object]] = []
+        for track in tracks:
+            if not isinstance(track, dict):
+                continue
+            minimal_tracks.append(
+                {
+                    field: track[field]
+                    for field in _MINIMAL_SUBTITLE_TRACK_FIELDS
+                    if isinstance(track.get(field), str)
+                }
+            )
+        minimal[language] = minimal_tracks
+    return minimal
 
 
 def _string_value(value: object) -> str:

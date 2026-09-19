@@ -147,7 +147,10 @@ class MockPipelineTests(unittest.TestCase):
         self.assertEqual(metadata.thumbnail_url, "https://example.com/thumb.jpg")
         self.assertEqual(metadata.status, "metadata_only")
         self.assertIn("youtube", metadata.tags)
-        self.assertEqual(metadata.raw_metadata, raw_info)
+        self.assertEqual(
+            metadata.raw_metadata,
+            {"provider": "yt-dlp", "subtitles": {}},
+        )
 
     def test_ytdlp_metadata_provider_rejects_non_youtube_source(self) -> None:
         source = resolve_video_source("https://example.com/watch?v=real123")

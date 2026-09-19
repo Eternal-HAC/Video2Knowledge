@@ -62,13 +62,20 @@ raw input
 -> local exporter
 ```
 
-- `platform_adapter` classifies URL and local file inputs and infers platform labels.
+- `platform_adapter` classifies URL and local file inputs and infers platform labels through exact hostname matching, not domain substring matching.
 - `platform_adapter` exposes platform capabilities for provider planning.
 - `pipeline` owns the import business flow so CLI stays thin.
 - `pipeline` also exposes a non-CLI local-file ASR orchestration boundary that
   composes injected audio, normalization, workspace, and Whisper components.
-- `downloader` exposes Mock metadata and real YouTube metadata-only extraction.
-- `transcript` provides Mock transcripts, official YouTube VTT/WebVTT subtitles, fallback eligibility policy, and Mock Whisper fallback orchestration.
+- `downloader` exposes Mock metadata and real YouTube metadata-only extraction,
+  sanitizes extraction failures to a stable public error, and keeps only the
+  minimal subtitle mapping the official subtitle provider needs in
+  `raw_metadata`.
+- `transcript` provides Mock transcripts, official YouTube VTT/WebVTT subtitles,
+  fallback eligibility policy, and Mock Whisper fallback orchestration. Subtitle
+  URLs (including redirect targets) are validated against the hostname the
+  request layer would use, and initial, redirect, and final response reads are
+  bounded and closed before any network callable runs.
 - `audio` provides Mock audio boundaries and a real ffmpeg normalizer for existing local files.
 - `whisper` provides the deterministic Mock local backend and a lazy optional
   `FasterWhisperBackend` boundary for existing normalized audio.
@@ -117,7 +124,7 @@ YouTube URL
 -> Markdown
 ```
 
-This stage does not download media, fetch subtitles, run Whisper, call LLMs, or export to external systems. `raw_metadata` stores the sanitized provider payload for debugging and future mapping, but it is not rendered into Markdown frontmatter or body content.
+This stage does not download media, fetch subtitles, run Whisper, call LLMs, or export to external systems. `raw_metadata` keeps only the minimal provider/subtitle mapping described under `v0.5.x Provider Input and Error Boundary Hardening`; it is not rendered into Markdown frontmatter or body content.
 
 ## Provider Direction
 
@@ -186,7 +193,7 @@ The Mock audio provider and normalizer do not read local media, write audio file
 
 Real audio acquisition remains disabled. Future audio download and audio cache retention require explicit user confirmation per stage. Runtime media artifacts belong only under `output/` or `cache/` paths and are ignored by Git.
 
-Signed media URLs, cookies, tokens, auth headers, and sensitive query parameters must not be written to logs, Markdown, `raw_metadata`, `TranscriptResult`, or error messages. Future audio and ffmpeg errors should report stable categories such as `audio download failed`, `audio processing failed`, or `ffmpeg not found` without exposing credentials or signed URLs.
+Signed media URLs, cookies, tokens, auth headers, and sensitive query parameters must not be written to logs, Markdown, `TranscriptResult`, error messages, or disk. The hardened `v0.5.x` metadata boundary keeps at most the minimal signed subtitle URL inside the in-memory `raw_metadata` mapping that the official subtitle provider consumes; it never reaches Markdown, logs, or errors. Future audio and ffmpeg errors should report stable categories such as `audio download failed`, `audio processing failed`, or `ffmpeg not found` without exposing credentials or signed URLs.
 
 ## v0.5.0d ffmpeg Normalizer Boundary
 
@@ -433,6 +440,133 @@ The orchestration remains non-CLI and is not selected by the default import
 pipeline or `real-fallback`. It does not validate YouTube audio acquisition,
 retained audio cache, detected language, pure-silence semantics, timestamp
 rounding policy, GPU/CUDA, VAD, batch mode, or model-cache management.
+
+## v0.5.x Provider Input and Error Boundary Hardening
+
+The real provider input surface is hardened before any live audio, ASR, or
+LLM integration. Each statement below is covered by fully offline unit tests in
+`tests/test_provider_security.py`. No live network, real provider, or media
+validation has been performed for this section, and it does not claim complete
+SSRF protection: DNS rebinding and resolver-level differences remain outside
+its scope.
+
+- Platform classification uses `urlparse(...).hostname` with exact
+  `host == domain or host.endswith("." + domain)` matching. Hostnames are
+  lowercased and stripped of trailing dots; userinfo URLs and empty hostnames
+  are never recognized as supported platforms. Suffix-confusion hosts such as
+  `notyoutube.com` or `youtube.com.evil.test` no longer match YouTube.
+  `youtu.be` additionally matches its exact host only: no `*.youtu.be`
+  subdomain receives YouTube capabilities, while real subdomains of
+  `youtube.com` and the other registered domains remain supported. An unknown
+  hostname that collides with a reserved platform id (for example
+  `https://youtube/x` or `https://user@youtube/x`) maps to the safe `unknown`
+  label so it can never obtain provider capabilities; ordinary unknown hosts
+  keep their normalized hostname label.
+- `YtDlpMetadataProvider` maps every extraction failure to the stable
+  `yt-dlp metadata extraction failed` error without the underlying exception
+  text or cause. The missing-dependency error and metadata shape validation
+  errors remain separate and stable. yt-dlp runs with a module-private quiet
+  logger injected through `ydl_opts["logger"]`, so raw yt-dlp errors, signed
+  URLs, tokens, cookies, local paths, and stderr output cannot reach
+  stdout/stderr before the sanitized exception is raised.
+- `VideoMetadata.raw_metadata` no longer stores the full sanitized yt-dlp
+  info. It keeps only `{"provider": "yt-dlp", "subtitles": {...}}`, where each
+  track retains at most `url`, `ext`, `protocol`, and `format`, and only when
+  the value is a plain string. Non-string, nested dict/list, or other mutable
+  values are dropped, so the output never shares references with provider-owned
+  objects. This field-and-type boundary removes separate headers, cookies,
+  fragments, paths, and arbitrary provider fields; it does not inspect the
+  contents of an allowed string field.
+  `YtDlpOfficialSubtitleProvider` consumes this minimal structure unchanged.
+- Subtitle fetching validates the initial URL before any network call: the
+  scheme must be `https`, a hostname must exist, userinfo is rejected, and the
+  port must be empty or `443`. The validated value is the hostname the HTTP
+  request layer would actually use, not the raw `urlparse` result:
+  `urllib.request.Request` percent-decodes the authority before the host
+  reaches the socket layer, platform resolvers drop a trailing DNS root dot,
+  and IDNA maps full-width digits and Unicode label separators onto ASCII.
+  Any percent encoding inside the authority is therefore rejected instead of
+  decoded — encoded and decoded forms can disagree about host and port — while
+  percent encoding in the path and query (where signed subtitle URLs carry
+  their signature) stays usable. The raw URL is checked before anything parses
+  it: any ASCII control character or DEL — tab, CR, LF, NUL, DEL, and the rest
+  — fails closed rather than being tolerated. That check has to run on the
+  unstripped string, because `urlparse` removes tab, CR, and LF from the whole
+  URL before it splits the authority off, so a per-authority check would never
+  see those three and the request layer would still contact the host they were
+  hiding inside; an embedded NUL additionally makes `socket.inet_aton` raise a
+  raw `ValueError`. The same rule is applied again to the parsed authority and
+  to the IDNA-normalized host, where IDNA's ASCII fast path would otherwise
+  pass such labels through without nameprep and reach the resolver unchanged.
+  The remaining checks run on the IDNA ASCII host with trailing
+  root dots removed: the reserved `localhost` namespace (`localhost`,
+  `localhost.`, `*.localhost`, and every full-width or upper-case spelling that
+  normalizes onto them) is rejected, and so are loopback, private, link-local,
+  multicast, reserved, and unspecified literals through `ipaddress`. Legacy
+  numeric IPv4 forms that the operating system would resolve as loopback or
+  private (`127.1`, `127.0.1`, `2130706433`, `0177.0.0.1`, `0x7f000001`) are
+  recognized offline via `socket.inet_aton` and rejected under the same rules,
+  and numeric-looking hosts that cannot be proven safe fail closed. A hostname
+  that cannot be safely encoded is rejected. The validator is total: an
+  unexpected parsing failure yields the same rejection instead of a raw
+  exception, and `KeyboardInterrupt` and `SystemExit` still propagate.
+  Ordinary DNS hostnames, public IPv4/IPv6 literals, and a trailing root dot on
+  a real name pass without extra resolution; DNS rebinding is not claimed to be
+  prevented in this stage.
+- A custom `HTTPRedirectHandler` applies the same validator to every redirect
+  target before the redirected request is constructed, and before the redirect
+  body is read or the parent opener is called. The raw `Location` is checked
+  first, before anything parses it: a tab, CR, LF, NUL, DEL, or any other ASCII
+  control character in it is refused outright — the same unstripped-string rule
+  the initial URL gets. Only then is it resolved exactly the way
+  `urllib.request` does — parse, give an authority-only target a `/` path,
+  re-serialize, percent-encode with latin-1, then `urljoin` against the URL of
+  the request being redirected — and that effective absolute target is what the
+  safety rules judge.
+  Relative (`/next.vtt`, `../next.vtt`, `?sig=abc`) and scheme-relative
+  (`//cdn.example.com/next.vtt`) targets are therefore accepted when they
+  resolve to a safe public HTTPS URL, and refused when they resolve to
+  loopback, the `localhost` namespace, an encoded authority, userinfo, a
+  non-`443` port, or a non-HTTPS scheme. A target that cannot be quoted,
+  encoded, or resolved at all is refused with the same stable `unsafe URL`
+  error instead of a raw `UnicodeError`. `redirect_request` validates the
+  absolute target the standard library itself computed once more, so both
+  layers agree. The handler also overrides the standard `http_error_30x`
+  dispatch (301, 302, 303, 307, and 308 share one policy): the redirect
+  response body is read with the same 16 MiB cap instead of the standard
+  library's unbounded drain, an oversized redirect body maps to the stable
+  `response too large` error, the current response is closed on safe, unsafe,
+  oversized, and parent-opener-failure paths, and rejection errors never expose
+  the `Location` URL, query, userinfo, headers, or body. A rejected redirect
+  never reaches the parent opener and its body is never read.
+- Redirect cleanup is best-effort so it can never replace the outcome it runs
+  alongside: a `close()` raising an ordinary exception is swallowed rather than
+  allowed to replace the stable `unsafe URL` or `response too large` error, the
+  platform, network, or `URLError` failure raised by the parent opener, a
+  successful redirect result, or a propagating `KeyboardInterrupt`/
+  `SystemExit`. The standard library closes a successfully followed redirect
+  response itself, so the cleanup is also idempotent: a repeated close that
+  fails does not invent a new public failure, and the underlying close text
+  never reaches a public error or a traceback. `KeyboardInterrupt` and
+  `SystemExit` raised by `close()` still propagate unchanged.
+- An HTTP status error closes its own response and never reads or exposes the
+  error body. A failing `close()` is swallowed under the same best-effort
+  cleanup policy as the redirect path, so it cannot replace the stable
+  `official subtitle VTT fetch failed: HTTP Error <status>` error, the HTTP
+  status code is preserved, no URL, header, body, or underlying exception is
+  exposed, and `KeyboardInterrupt` and `SystemExit` still propagate unchanged.
+- Subtitle responses are read with a 16 MiB module-level limit
+  (`MAX_SUBTITLE_RESPONSE_BYTES`). An oversized `Content-Length` is rejected
+  before the body is read, and the body read itself is bounded to
+  `limit + 1` bytes, so a missing or lying `Content-Length` cannot bypass the
+  limit. Initial, redirect, and final responses are all covered by this bound.
+- Charset handling supports UTF-8 and any legal response charset. Unknown
+  charsets, charset lookup failures, and decode failures map to the stable
+  `official subtitle VTT fetch failed: unsupported or invalid subtitle
+  encoding` error. Unsafe URLs, oversized responses, HTTP status codes,
+  timeouts, and network failures keep their existing stable public categories,
+  and none of them retain an underlying exception cause. `KeyboardInterrupt`
+  and `SystemExit` propagate unchanged.
 
 ## URL Intake Boundaries
 

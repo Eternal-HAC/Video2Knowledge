@@ -35,13 +35,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--metadata-provider",
         choices=["mock", "yt-dlp"],
         default="mock",
-        help="Metadata provider to use. Only mock is implemented.",
+        help="Metadata provider to use. yt-dlp supports YouTube metadata only.",
     )
     import_url.add_argument(
         "--transcript-provider",
         choices=["mock", "official-subtitles", "real-fallback"],
         default="mock",
-        help="Transcript provider to use. Official subtitles support YouTube VTT only.",
+        help="Transcript provider to use. official-subtitles supports YouTube "
+        "VTT only; real-fallback uses the Mock audio/Whisper boundary.",
     )
     return parser
 
