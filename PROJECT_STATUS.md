@@ -760,3 +760,154 @@ Remaining boundaries:
   backed by offline tests only.
 - CLI command surface, fallback eligibility, provider ids, and
   `attempted_providers` behavior are unchanged.
+
+## 2026-09-20 Explicit Local ASR CLI (v0.5.5b)
+
+Implemented the approved explicit local ASR CLI stage.
+
+What changed:
+
+- Added the independent `transcribe-local` subcommand to `app.cli`:
+  `python -m app.cli transcribe-local <path> [--model small] [--device cpu]
+  [--compute-type int8] [--language CODE] [--ffmpeg-path EXECUTABLE]
+  [--allow-model-download] [--format text|json]`. `import-url` is unchanged.
+- The CLI parses arguments, requires a `local_file`/`local` classification from
+  `resolve_video_source`, builds neutral local `VideoMetadata` privately without
+  `get_mock_metadata`, constructs the dependencies, and delegates transcription
+  to the existing `app.pipeline.transcribe_local_media`. Provider and local-file
+  validation stay in `LocalFileAudioProvider` and the pipeline. The metadata is
+  exactly `title=Path(path).stem` (fallback `Local media`), `platform="local"`,
+  `source_url=path`, empty `author`/`published_at`/`duration`/`language`,
+  `tags=[]`, `status="local_input"`, and `raw_metadata=None`.
+- Input classification is wrapped so that a `ValueError` raised inside
+  `resolve_video_source` — for example a malformed IPv6 authority that
+  `urlparse` cannot parse — becomes the same stable
+  `local media file path required` error with exit code 1 instead of a
+  traceback. Only that classification step converts it; `KeyboardInterrupt` and
+  `SystemExit` are not intercepted, and a `ValueError` raised later still
+  propagates as a programming error.
+- Model loading is offline by default. `--allow-model-download` is the only
+  switch that permits model download; the CLI passes
+  `local_files_only=not allow_model_download`, so no environment or
+  configuration input can widen the policy.
+- The offline policy is enforced as a real boundary rather than a single
+  library flag. In faster-whisper 1.2.1, `WhisperModel(local_files_only=True)`
+  constrains only the model-snapshot download: when the resolved snapshot has no
+  `tokenizer.json`, the library calls `tokenizers.Tokenizer.from_pretrained`,
+  which does not accept the flag and reaches the Hub. With
+  `local_files_only=True` the backend therefore resolves the model first — an
+  existing local model directory is used as-is, otherwise
+  `download_model(model_size, local_files_only=True)` returns an existing cached
+  snapshot or fails closed because nothing is cached — and requires a regular
+  `tokenizer.json` inside the resolved directory before constructing
+  `WhisperModel`. The resolved local directory is what reaches `WhisperModel`,
+  with `local_files_only=True` still passed. A missing tokenizer, an
+  unresolvable model, and any other resolution failure are all sanitized to
+  `local transcription failed` before `WhisperModel` is constructed. No
+  environment variable, monkey patch, or new dependency is involved.
+  `local_files_only=False` is unchanged: the model reference is passed through
+  with no pre-resolution and no tokenizer check.
+- `--ffmpeg-path` is validated as an existing regular file and injected as
+  `FfmpegAudioNormalizer(output_dir=workspace_path, ffmpeg_path=override)`
+  through `normalizer_factory`. When absent, the existing PATH discovery is
+  unchanged. Validation errors never echo the supplied path and reuse the
+  boundary's existing `ffmpeg not found` message instead of a second wording.
+- Default text stdout is `Provider:`, `Attempted providers:`, then
+  `[start --> end] text` lines. `--format json` prints exactly `provider`,
+  `attempted_providers`, and `segments[{start, end, text}]` with
+  `ensure_ascii=False`. No transcript file, Markdown file, or export is written,
+  and the import pipeline and Markdown exporter are never called.
+- Failures inside `AudioAcquisitionError`, `AudioProcessingError` /
+  `FfmpegNotFoundError`, and `LocalTranscriptionError` print one stable
+  `Error: <message>` line to stderr and return exit code 1 without causes,
+  paths, or tracebacks. In the default offline mode an exact
+  `local transcription failed` failure prints exactly two lines with one final
+  newline:
+
+  ```text
+  Error: local transcription failed
+  Hint: offline model loading is enabled; use an existing cached model, a local model directory, or explicitly pass --allow-model-download.
+  ```
+
+  The hint is a separate `Hint:` line, not a parenthetical suffix on the
+  `Error:` line, and `--allow-model-download` or any other message prints no
+  hint. `KeyboardInterrupt`, `SystemExit`, and any exception outside those three
+  business categories propagate unchanged.
+- `FasterWhisperBackend` gained `local_files_only: bool = False`, passed
+  straight to `WhisperModel`. The default keeps every earlier direct caller
+  behaviorally compatible with the previous download-allowed behavior, while the
+  `WhisperModel` call now always passes the keyword explicitly, so callers or
+  stubs asserting the exact keyword set observe one added argument. Construction
+  still has no dependency, file, model, or network side effects; input-file
+  validation still runs before the optional dependency import.
+- No changes to `app/pipeline.py`, `app/audio.py`, `app/models.py`,
+  `app/errors.py`, `app/transcript.py`, packaging, or dependencies.
+
+Validation:
+
+- `tests/test_local_asr_cli.py` adds 41 fully mocked tests covering parser
+  grammar and help, the required path, URL rejection through
+  `resolve_video_source`, malformed-URL classification failure (a real
+  `http://[::1` input and a mocked `ValueError`) returning the stable error with
+  exit code 1, no traceback, and no orchestration call, unchanged
+  control-flow propagation during classification, the exact neutral metadata
+  fields (including the `Local media` title fallback, `status="local_input"`,
+  and `raw_metadata=None`), default and overridden backend arguments, a local
+  model directory passed to the backend unchanged, the local-files-only policy,
+  ffmpeg override and PATH behavior, the shared `ffmpeg not found` message,
+  the single orchestration call, text and JSON rendering, provider fields,
+  stable and sanitized errors, the exact two-line offline hint, control-flow
+  exceptions, unchanged user files and directory listings, no output files, no
+  import pipeline or exporter call, and `import-url` regression.
+- `tests/test_whisper_backend.py` adds offline resolution and tokenizer-guard
+  coverage: an offline model name resolving through
+  `download_model(..., local_files_only=True)` into a cached directory that
+  reaches `WhisperModel`, an offline local model directory that skips
+  `download_model` entirely, a resolved snapshot and a local directory without
+  `tokenizer.json` rejected before `WhisperModel` with the sanitized message, a
+  failing `download_model` rejected before `WhisperModel` with a sanitized
+  message, propagating `KeyboardInterrupt`/`SystemExit` during resolution, and
+  `local_files_only=False` passing the model reference through with no
+  pre-resolution.
+- `python -m unittest tests.test_local_asr_cli`: 41 tests, OK.
+- `python -m unittest tests.test_whisper_backend`: 31 tests, OK.
+- `python -m unittest discover -s tests`: 257 tests, 256 passed, 1 skipped (the
+  pre-existing Windows symlink case).
+- `python -m app.cli transcribe-local --help` prints the approved grammar.
+- `python -m app.cli import-url "https://example.com/watch?v=mock"
+  --metadata-provider mock --transcript-provider mock --output-dir
+  output/markdown` still returns exit code 0 and writes the Markdown note.
+- Offline probes with no ASR dependency: a URL returns
+  `Error: local media file path required`, a malformed URL (`http://[::1`)
+  returns `Error: local media file path required` with no traceback, a missing
+  path returns `Error: local audio input file not found`, and a missing
+  `--ffmpeg-path` returns `Error: ffmpeg not found`, each with exit code 1.
+- A separate offline probe replaced only the `faster_whisper` module in
+  `sys.modules` with an in-memory stub and confirmed that an offline model name
+  calls `download_model(..., local_files_only=True)` and never constructs
+  `WhisperModel` when nothing is cached, that a local directory without
+  `tokenizer.json` is rejected without calling `download_model` or
+  `WhisperModel`, that a local directory with `tokenizer.json` reaches
+  `WhisperModel` as the resolved directory, and that online mode passes the
+  model reference through unchanged. No real model was loaded and no network
+  call was made.
+- The exact two-line offline failure output is asserted by the mocked
+  `tests/test_local_asr_cli.py` error tests, which compare `stderr` to
+  `Error: local transcription failed` followed by the `Hint:` line and one final
+  newline. No real failure path was executed to produce it.
+- `git diff --check` passed. No network access, provider call, ffmpeg or
+  faster-whisper execution, model download, or dependency change occurred.
+
+Remaining boundaries:
+
+- The command is covered by mocked tests only. No real `transcribe-local` CLI
+  smoke test, real ffmpeg CLI run, or real faster-whisper CLI run has been
+  performed, so the command's real end-to-end behavior is unverified. In
+  particular, no real cached snapshot was resolved and no real
+  `download_model(local_files_only=True)` call was made, so the offline
+  resolution path is proven against a stub rather than against a real cache.
+- The default import pipeline, `real-fallback`, YouTube audio acquisition,
+  retained cache, model-cache lifecycle, detected-language reporting, LLM
+  extraction, Markdown, and export behavior are unchanged.
+- `TranscriptResult` still has no language field, so a detected language cannot
+  be reported even though a requested language is passed to the backend.

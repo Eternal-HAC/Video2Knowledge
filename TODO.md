@@ -69,8 +69,29 @@
       error, a parent-opener failure, a successful redirect result, or a
       propagating `KeyboardInterrupt`/`SystemExit`), proven by fully offline
       tests. DNS rebinding and resolver-level TOCTOU remain out of scope.
-- [ ] Add explicit local ASR CLI entry point (parameter surface to be locked
-      by Architecture & Product first).
+- [x] Add the explicit local ASR CLI entry point (`transcribe-local`) with an
+      offline-by-default model policy (`local_files_only=True` unless
+      `--allow-model-download` is passed), an optional validated
+      `--ffmpeg-path`, neutral private local metadata (path-stem title with a
+      `Local media` fallback, `status="local_input"`, `raw_metadata=None`),
+      delegation to the existing `transcribe_local_media`, an exact two-line
+      offline failure message, and stdout-only text/JSON `TranscriptResult`
+      output, proven by fully mocked tests. No real CLI smoke test has been run.
+- [x] Make the offline model policy a real boundary: with
+      `local_files_only=True` the backend resolves the model to an existing
+      local directory or an existing cached snapshot through
+      `download_model(model_size, local_files_only=True)` and requires a regular
+      `tokenizer.json` there before constructing `WhisperModel`, so the
+      faster-whisper tokenizer fallback (`Tokenizer.from_pretrained`, which
+      ignores the flag) cannot reach Hugging Face Hub. All resolution failures
+      stay sanitized to `local transcription failed`, and
+      `local_files_only=False` keeps the previous direct behavior. Proven by
+      fully mocked tests.
+- [x] Convert a `ValueError` from input classification (a malformed URL such as
+      `http://[::1`) into the stable `local media file path required` error, and
+      report an invalid `--ffmpeg-path` with the boundary's existing
+      `ffmpeg not found` message instead of a CLI-specific wording.
+- [ ] Run a separately confirmed real `transcribe-local` CLI smoke test.
 - [ ] Add transcript API fallback.
 - [ ] Add local Whisper fallback.
 - [ ] Add YAML Frontmatter hardening.

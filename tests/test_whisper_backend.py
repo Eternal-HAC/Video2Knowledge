@@ -39,12 +39,14 @@ class FasterWhisperBackendTests(unittest.TestCase):
                 device="cpu",
                 compute_type="int8",
                 language="en",
+                local_files_only=True,
             )
 
         self.assertEqual(backend.model_size, "tiny")
         self.assertEqual(backend.device, "cpu")
         self.assertEqual(backend.compute_type, "int8")
         self.assertEqual(backend.language, "en")
+        self.assertTrue(backend.local_files_only)
 
     def test_missing_input_is_rejected_before_dependency_import(self) -> None:
         audio = _normalized_audio(Path("private-missing-input.wav"))
@@ -114,10 +116,242 @@ class FasterWhisperBackendTests(unittest.TestCase):
             "medium",
             device="cuda",
             compute_type="float16",
+            local_files_only=False,
         )
         model.transcribe.assert_called_once_with(input_path, language="zh")
         self.assertEqual(result.provider, FASTER_WHISPER_PROVIDER_ID)
         self.assertEqual(result.attempted_providers, [FASTER_WHISPER_PROVIDER_ID])
+
+    def test_local_files_only_default_is_false(self) -> None:
+        fake_module, _ = _fake_faster_whisper_module([_segment(0.0, 1.0, "text")])
+        with _temporary_audio() as audio:
+            with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                backend = FasterWhisperBackend()
+                backend.transcribe(audio)
+
+        self.assertFalse(backend.local_files_only)
+        fake_module.WhisperModel.assert_called_once_with(
+            "small",
+            device="auto",
+            compute_type="default",
+            local_files_only=False,
+        )
+
+    def test_local_files_only_override_passes_through(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            resolved_model_path = _local_model_dir(Path(temp_dir) / "cached-small")
+            fake_module, _ = _fake_faster_whisper_module(
+                [_segment(0.0, 1.0, "text")],
+                resolved_model_path=resolved_model_path,
+            )
+            with _temporary_audio() as audio:
+                with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                    backend = FasterWhisperBackend(
+                        model_size="small",
+                        device="cpu",
+                        compute_type="int8",
+                        local_files_only=True,
+                    )
+                    backend.transcribe(audio)
+
+            fake_module.download_model.assert_called_once_with(
+                "small",
+                local_files_only=True,
+            )
+            fake_module.WhisperModel.assert_called_once_with(
+                str(resolved_model_path),
+                device="cpu",
+                compute_type="int8",
+                local_files_only=True,
+            )
+        self.assertTrue(backend.local_files_only)
+
+    def test_offline_model_name_uses_the_resolved_cache_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            resolved_model_path = _local_model_dir(Path(temp_dir) / "hf-snapshot")
+            fake_module, model = _fake_faster_whisper_module(
+                [_segment(0.0, 1.0, " cached ")],
+                resolved_model_path=resolved_model_path,
+            )
+            with _temporary_audio() as audio:
+                with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                    result = FasterWhisperBackend(
+                        model_size="small",
+                        device="cpu",
+                        compute_type="int8",
+                        local_files_only=True,
+                    ).transcribe(audio)
+                input_path = str(audio.path)
+
+            fake_module.download_model.assert_called_once_with(
+                "small",
+                local_files_only=True,
+            )
+            fake_module.WhisperModel.assert_called_once_with(
+                str(resolved_model_path),
+                device="cpu",
+                compute_type="int8",
+                local_files_only=True,
+            )
+            model.transcribe.assert_called_once_with(input_path, language=None)
+
+        self.assertEqual(result.provider, FASTER_WHISPER_PROVIDER_ID)
+        self.assertEqual(
+            [(item.start, item.end, item.text) for item in result.segments],
+            [("00:00:00.000", "00:00:01.000", "cached")],
+        )
+
+    def test_offline_local_model_directory_skips_cache_resolution(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_model_path = _local_model_dir(Path(temp_dir) / "user-model")
+            fake_module, _ = _fake_faster_whisper_module(
+                [_segment(0.0, 1.0, "local")],
+                resolved_model_path=Path(temp_dir) / "unused-snapshot",
+            )
+            fake_module.download_model.side_effect = AssertionError(
+                "a local model directory must not resolve through the cache"
+            )
+            with _temporary_audio() as audio:
+                with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                    FasterWhisperBackend(
+                        model_size=str(local_model_path),
+                        device="cpu",
+                        compute_type="int8",
+                        local_files_only=True,
+                    ).transcribe(audio)
+
+            fake_module.download_model.assert_not_called()
+            fake_module.WhisperModel.assert_called_once_with(
+                str(local_model_path),
+                device="cpu",
+                compute_type="int8",
+                local_files_only=True,
+            )
+
+    def test_offline_resolved_model_without_tokenizer_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            incomplete_model_path = Path(temp_dir) / "snapshot-without-tokenizer"
+            incomplete_model_path.mkdir()
+            (incomplete_model_path / "model.bin").write_bytes(b"weights")
+            fake_module, _ = _fake_faster_whisper_module(
+                [_segment(0.0, 1.0, "text")],
+                resolved_model_path=incomplete_model_path,
+            )
+            with _temporary_audio() as audio:
+                with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                    with self.assertRaises(LocalTranscriptionError) as context:
+                        FasterWhisperBackend(
+                            model_size="small",
+                            local_files_only=True,
+                        ).transcribe(audio)
+
+            fake_module.WhisperModel.assert_not_called()
+
+        self.assertEqual(str(context.exception), "local transcription failed")
+        _assert_sanitized_traceback(self, context.exception)
+        self.assertNotIn("snapshot-without-tokenizer", str(context.exception))
+
+    def test_offline_local_model_directory_without_tokenizer_is_rejected(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_model_path = Path(temp_dir) / "user-model"
+            local_model_path.mkdir()
+            fake_module, _ = _fake_faster_whisper_module(
+                [_segment(0.0, 1.0, "text")]
+            )
+            with _temporary_audio() as audio:
+                with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                    with self.assertRaises(LocalTranscriptionError) as context:
+                        FasterWhisperBackend(
+                            model_size=str(local_model_path),
+                            local_files_only=True,
+                        ).transcribe(audio)
+
+            fake_module.download_model.assert_not_called()
+            fake_module.WhisperModel.assert_not_called()
+
+        self.assertEqual(str(context.exception), "local transcription failed")
+        _assert_sanitized_traceback(self, context.exception)
+        self.assertNotIn("user-model", str(context.exception))
+
+    def test_offline_resolution_failure_is_rejected_before_model_construction(
+        self,
+    ) -> None:
+        fake_module, _ = _fake_faster_whisper_module([_segment(0.0, 1.0, "text")])
+        fake_module.download_model.side_effect = RuntimeError(
+            "C:\\Users\\private\\.cache\\huggingface token=secret"
+        )
+        with _temporary_audio() as audio:
+            with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                with self.assertRaises(LocalTranscriptionError) as context:
+                    FasterWhisperBackend(
+                        model_size="small",
+                        local_files_only=True,
+                    ).transcribe(audio)
+
+        fake_module.WhisperModel.assert_not_called()
+        self.assertEqual(str(context.exception), "local transcription failed")
+        _assert_sanitized_traceback(self, context.exception)
+
+    def test_offline_resolution_keyboard_interrupt_propagates(self) -> None:
+        fake_module, _ = _fake_faster_whisper_module([_segment(0.0, 1.0, "text")])
+        fake_module.download_model.side_effect = KeyboardInterrupt()
+        with _temporary_audio() as audio:
+            with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                with self.assertRaises(KeyboardInterrupt):
+                    FasterWhisperBackend(
+                        model_size="small",
+                        local_files_only=True,
+                    ).transcribe(audio)
+
+            fake_module.WhisperModel.assert_not_called()
+
+    def test_offline_resolution_system_exit_propagates(self) -> None:
+        fake_module, _ = _fake_faster_whisper_module([_segment(0.0, 1.0, "text")])
+        fake_module.download_model.side_effect = SystemExit(7)
+        with _temporary_audio() as audio:
+            with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                with self.assertRaises(SystemExit) as context:
+                    FasterWhisperBackend(
+                        model_size="small",
+                        local_files_only=True,
+                    ).transcribe(audio)
+
+            fake_module.WhisperModel.assert_not_called()
+
+        self.assertEqual(context.exception.code, 7)
+
+    def test_online_mode_keeps_direct_model_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_model_path = _local_model_dir(Path(temp_dir) / "user-model")
+            fake_module, model = _fake_faster_whisper_module(
+                [_segment(0.0, 1.0, "online")],
+                resolved_model_path=Path(temp_dir) / "unused-snapshot",
+            )
+            fake_module.download_model.side_effect = AssertionError(
+                "online mode must not pre-resolve a model"
+            )
+            with _temporary_audio() as audio:
+                with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                    result = FasterWhisperBackend(
+                        model_size="small",
+                        device="cpu",
+                        compute_type="int8",
+                        local_files_only=False,
+                    ).transcribe(audio)
+                input_path = str(audio.path)
+
+            fake_module.download_model.assert_not_called()
+            fake_module.WhisperModel.assert_called_once_with(
+                "small",
+                device="cpu",
+                compute_type="int8",
+                local_files_only=False,
+            )
+            model.transcribe.assert_called_once_with(input_path, language=None)
+
+        self.assertEqual(result.segments[0].text, "online")
 
     def test_single_segment_is_mapped(self) -> None:
         fake_module, _ = _fake_faster_whisper_module(
@@ -169,6 +403,9 @@ class FasterWhisperBackendTests(unittest.TestCase):
         fake_module = types.ModuleType("faster_whisper")
         fake_module.WhisperModel = mock.Mock(
             side_effect=RuntimeError("private-model-cache token=secret")
+        )
+        fake_module.download_model = mock.Mock(
+            side_effect=AssertionError("online mode must not resolve a model")
         )
         with _temporary_audio() as audio:
             with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
@@ -273,6 +510,9 @@ class FasterWhisperBackendTests(unittest.TestCase):
     def test_model_system_exit_propagates(self) -> None:
         fake_module = types.ModuleType("faster_whisper")
         fake_module.WhisperModel = mock.Mock(side_effect=SystemExit(7))
+        fake_module.download_model = mock.Mock(
+            side_effect=AssertionError("online mode must not resolve a model")
+        )
         with _temporary_audio() as audio:
             with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
                 with self.assertRaises(SystemExit) as context:
@@ -376,6 +616,7 @@ def _assert_sanitized_traceback(
 def _fake_faster_whisper_module(
     segments: object,
     language: str = "en",
+    resolved_model_path: Path | None = None,
 ) -> tuple[types.ModuleType, mock.Mock]:
     module = types.ModuleType("faster_whisper")
     model = mock.Mock()
@@ -384,7 +625,23 @@ def _fake_faster_whisper_module(
         types.SimpleNamespace(language=language),
     )
     module.WhisperModel = mock.Mock(return_value=model)
+    if resolved_model_path is None:
+        # Offline resolution on a test that only allows direct model use must
+        # fail closed rather than silently succeed past the mocked boundary.
+        module.download_model = mock.Mock(
+            side_effect=AssertionError("unexpected model download")
+        )
+    else:
+        module.download_model = mock.Mock(return_value=str(resolved_model_path))
     return module, model
+
+
+def _local_model_dir(path: Path) -> Path:
+    """Create one fake local model directory that can serve its tokenizer."""
+
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "tokenizer.json").write_text("{}", encoding="utf-8")
+    return path
 
 
 class _temporary_audio:

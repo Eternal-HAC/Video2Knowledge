@@ -63,6 +63,14 @@ Status: Completed at `v0.3.0`.
 - [x] Declare the validated faster-whisper runtime as the optional `asr` dependency set.
 - [x] Add mocked local-file-to-ASR orchestration with strict local input ownership and private normalized-artifact cleanup.
 - [x] Run a separately approved real local-file-to-ASR integration smoke test.
+- [x] Add the explicit `transcribe-local` CLI subcommand with an
+      offline-by-default model policy, an optional validated `--ffmpeg-path`,
+      and stdout-only `TranscriptResult` output, proven by fully mocked tests.
+- [x] Make the offline policy a real boundary: resolve the model to an existing
+      local directory or cache and require a local `tokenizer.json` before
+      `WhisperModel` is constructed, so the tokenizer fallback cannot reach
+      Hugging Face Hub.
+- [ ] Run a separately confirmed real `transcribe-local` CLI smoke test.
 - [ ] Wire real local transcription into an explicitly selected fallback path.
 - Keep local transcription separate from metadata and LLM work.
 - Require explicit future confirmation before audio acquisition or dependency installation.

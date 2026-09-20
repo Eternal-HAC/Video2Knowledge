@@ -282,3 +282,92 @@
   processing was run. This is still not a complete SSRF defense: DNS rebinding
   and resolver-level time-of-check/time-of-use differences remain outside the
   current capability.
+
+## 2026-09-20
+
+- Added the independent `transcribe-local` CLI subcommand:
+  `python -m app.cli transcribe-local <path> [--model small] [--device cpu]
+  [--compute-type int8] [--language CODE] [--ffmpeg-path EXECUTABLE]
+  [--allow-model-download] [--format text|json]`. The existing `import-url`
+  command, its flags, and its output are unchanged.
+- The CLI parses arguments, requires a `local_file`/`local` classification from
+  the existing `resolve_video_source`, builds neutral local `VideoMetadata`
+  privately without `get_mock_metadata`, constructs the dependencies, and calls
+  the existing `app.pipeline.transcribe_local_media`. Local-file validation
+  stays in `LocalFileAudioProvider`; no pipeline, audio, model, error,
+  transcript, packaging, or dependency file was modified.
+- The neutral metadata is exactly `title=Path(path).stem` with the `Local media`
+  fallback for an empty stem, `platform="local"`, `source_url=path`, empty
+  `author`/`published_at`/`duration`/`language`, `tags=[]`,
+  `status="local_input"`, and `raw_metadata=None`.
+- Model loading is offline by default: `FasterWhisperBackend` gained
+  `local_files_only: bool = False` and the CLI passes
+  `local_files_only=not allow_model_download`. `--allow-model-download` is the
+  only switch that permits a model download, so no environment or configuration
+  input can silently widen the policy. The default `False` keeps every earlier
+  direct caller behaviorally compatible; the `WhisperModel` call itself now
+  always passes the keyword explicitly, so callers or stubs that asserted the
+  exact keyword set see one added argument rather than byte-identical
+  arguments. The constructor still imports nothing, loads no model, and touches
+  no file or network.
+- Closed the tokenizer fallback in the offline path. In faster-whisper 1.2.1 a
+  `local_files_only=True` `WhisperModel` only constrains the model-snapshot
+  download: when the resolved snapshot has no `tokenizer.json`, the library
+  calls `tokenizers.Tokenizer.from_pretrained`, which reaches Hugging Face Hub
+  despite the flag. With `local_files_only=True` the backend now resolves the
+  model before constructing `WhisperModel` — an existing local model directory
+  is used as-is, otherwise `download_model(model_size, local_files_only=True)`
+  returns an existing cached snapshot or fails closed — and requires a regular
+  `tokenizer.json` inside the resolved directory. The resolved local directory
+  is passed to `WhisperModel` with `local_files_only=True` still set. A missing
+  tokenizer, an unresolvable model, and any other resolution failure are all
+  sanitized to `local transcription failed` before `WhisperModel` is
+  constructed. No environment variable, monkey patch, or new dependency is
+  used, and `local_files_only=False` keeps the previous direct behavior with no
+  pre-resolution and no tokenizer check.
+- Input classification now maps a `ValueError` raised by `resolve_video_source`
+  — for example a malformed IPv6 URL that `urlparse` cannot parse — to the same
+  stable `local media file path required` error with exit code 1 instead of a
+  traceback. Only that classification step converts it; `KeyboardInterrupt` and
+  `SystemExit` are not intercepted, and a later `ValueError` still propagates.
+- `--ffmpeg-path` is validated as an existing regular file and injected through
+  `normalizer_factory` as
+  `FfmpegAudioNormalizer(output_dir=workspace_path, ffmpeg_path=override)`, so
+  normalized output still lands in the private workspace and keeps the existing
+  cleanup lifecycle. An omitted flag keeps the existing PATH discovery
+  untouched, and validation errors never echo the supplied path and reuse the
+  boundary's existing `ffmpeg not found` wording rather than adding a second
+  message for the same failure.
+- Default text stdout is `Provider:`, `Attempted providers:`, then
+  `[start --> end] text` lines; `--format json` prints exactly `provider`,
+  `attempted_providers`, and `segments[{start, end, text}]` with
+  `ensure_ascii=False`. Output contains only `TranscriptResult` fields, and the
+  command writes no transcript file, no Markdown, and no export.
+- Failures in `AudioAcquisitionError`, `AudioProcessingError` /
+  `FfmpegNotFoundError`, and `LocalTranscriptionError` print one stable
+  sanitized `Error: <message>` line to stderr and return exit code 1, without
+  causes, paths, or tracebacks. In the default offline mode an exact
+  `local transcription failed` failure prints exactly two lines with one final
+  newline:
+
+  ```text
+  Error: local transcription failed
+  Hint: offline model loading is enabled; use an existing cached model, a local model directory, or explicitly pass --allow-model-download.
+  ```
+
+  The hint is a separate `Hint:` line, not a parenthetical suffix on the
+  `Error:` line. An explicit `--allow-model-download` or any other message
+  prints no hint. `KeyboardInterrupt` and `SystemExit` propagate unchanged.
+- Added 41 fully mocked tests in `tests/test_local_asr_cli.py`, including
+  malformed-URL classification, the shared `ffmpeg not found` message, and the
+  local model directory pass-through, plus offline model-resolution,
+  tokenizer-guard, and pass-through tests in `tests/test_whisper_backend.py`
+  (`python -m unittest tests.test_local_asr_cli`: 41 OK;
+  `python -m unittest tests.test_whisper_backend`: 31 OK; full suite: 257
+  executed, 256 passed, 1 pre-existing Windows symlink skip).
+- No real ffmpeg, faster-whisper, model download, provider call, or network
+  access was performed, and no real `transcribe-local` CLI smoke test has been
+  run: this stage is mocked-test evidence only. Default pipeline,
+  `real-fallback`, YouTube audio acquisition, retained cache, model-cache
+  lifecycle, detected language, LLM extraction, Markdown, and export behavior
+  are unchanged.

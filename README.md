@@ -45,6 +45,9 @@ Current development milestone: `v0.5.x Whisper Fallback`
   a user-owned local M4A was normalized by ffmpeg and transcribed by
   faster-whisper on CPU into `TranscriptResult`, while preserving the source
   file and cleaning the temporary normalized artifact and workspace.
+- An explicit `transcribe-local` CLI subcommand for one user-owned local media
+  file, with local-files-only model loading by default, an optional explicit
+  ffmpeg executable, and stdout-only `TranscriptResult` output.
 
 ## Not Implemented
 
@@ -52,9 +55,12 @@ Current development milestone: `v0.5.x Whisper Fallback`
 - ffmpeg integration into the default `real-fallback` chain.
 - faster-whisper selection in the default import pipeline or `real-fallback`.
   The backend boundary, optional dependency combination, standalone CPU
-  transcription, and non-CLI local-file integration have been validated, but no
-  supported end-to-end CLI path uses them yet.
-- A supported CLI entry point for real local-file ASR.
+  transcription, non-CLI local-file integration, and the explicit
+  `transcribe-local` command exist, but the default import pipeline still does
+  not select the real backend.
+- A validated real `transcribe-local` CLI run. The command surface is
+  implemented and covered by fully mocked tests only; no real
+  ffmpeg/faster-whisper CLI smoke test has been run.
 - Automatic captions.
 - Transcript API fallback.
 - LLM knowledge extraction.
@@ -99,6 +105,67 @@ The official subtitle provider:
 - Does not write subtitle files to the project.
 - Does not fall back on platform or network access failures.
 
+## Local ASR CLI
+
+```powershell
+python -m app.cli transcribe-local "path\to\user-owned-media.m4a"
+python -m app.cli transcribe-local "path\to\media.mp4" --model small --device cpu --compute-type int8 --language zh --format json
+python -m app.cli transcribe-local "path\to\media.mp4" --ffmpeg-path "C:\tools\ffmpeg.exe"
+python -m app.cli transcribe-local "path\to\media.mp4" --allow-model-download
+```
+
+`transcribe-local` is an independent subcommand that accepts one user-owned
+local media file path. `import-url` is unchanged.
+
+- `--model` (default `small`), `--device` (default `cpu`),
+  `--compute-type` (default `int8`), `--language` (unset by default).
+- `--ffmpeg-path` selects an explicit ffmpeg executable; when it is omitted the
+  existing PATH discovery inside `FfmpegAudioNormalizer` is used. A path that is
+  not an existing regular file fails with the boundary's existing
+  `ffmpeg not found` message.
+- `--allow-model-download` is the only way to permit a model download. Without
+  it, `FasterWhisperBackend` runs with `local_files_only=True`, resolves the
+  model to an existing cached snapshot or to the supplied local model directory,
+  and requires that directory to contain `tokenizer.json` before constructing
+  `WhisperModel`, so neither the model snapshot nor the tokenizer can reach
+  Hugging Face Hub. An uncached model name in offline mode fails with the
+  offline hint below instead of downloading.
+- `--format text|json` (default `text`) selects the stdout rendering.
+
+Default text stdout:
+
+```text
+Provider: faster_whisper
+Attempted providers: faster_whisper
+[00:00:00.000 --> 00:00:05.000] transcript text
+```
+
+`--format json` prints `provider`, `attempted_providers`, and
+`segments[{start, end, text}]` with `ensure_ascii=False`.
+
+The command writes no transcript file and no Markdown, and renders only
+`TranscriptResult` fields. It builds neutral metadata for the local file
+(`title` from the path stem, falling back to `Local media`; `platform="local"`;
+`source_url` set to the given path; `status="local_input"`; no Mock or provider
+metadata).
+
+Failures print one stable `Error: ...` line to stderr and return exit code 1.
+Input the URL parser cannot parse at all, such as a malformed IPv6 URL, is still
+treated as input to classify: it returns `Error: local media file path required`
+with exit code 1 and no traceback. When the default offline mode fails with
+exactly `local transcription failed`, stderr is two lines:
+
+```text
+Error: local transcription failed
+Hint: offline model loading is enabled; use an existing cached model, a local model directory, or explicitly pass --allow-model-download.
+```
+
+The command is implemented and covered by fully mocked tests only. No real
+`transcribe-local` CLI smoke test has been run, and the command is not selected
+by the default import pipeline, `real-fallback`, or YouTube audio acquisition.
+The offline model guard is also covered by mocked tests only: no model was
+loaded, no cache was inspected, and no network call was made.
+
 ## Current Fallback Behavior
 
 `real-fallback` first requests official subtitles.
@@ -130,13 +197,14 @@ It does not download or read media, run ffmpeg, or run Whisper.
 
 A user-confirmed local smoke test passed with `ffprobe` validation. This boundary is not connected to `real-fallback` by default.
 
-The non-CLI `transcribe_local_media` boundary has also completed a separately
-approved real local-file integration smoke test with the default local provider,
-private workspace, real ffmpeg normalization, and `FasterWhisperBackend` on
-CPU. It returned `TranscriptResult` while leaving the user-owned source file
-unchanged and cleaning temporary output. This does not add a CLI command, does
-not connect real ASR to the default import pipeline or `real-fallback`, and does
-not validate YouTube audio acquisition.
+The `transcribe_local_media` boundary has also completed a separately approved
+real local-file integration smoke test with the default local provider, private
+workspace, real ffmpeg normalization, and `FasterWhisperBackend` on CPU. It
+returned `TranscriptResult` while leaving the user-owned source file unchanged
+and cleaning temporary output. That smoke test predates the `transcribe-local`
+subcommand and drove the boundary directly; it did not connect real ASR to the
+default import pipeline or `real-fallback`, and it did not validate YouTube
+audio acquisition or the CLI command itself.
 
 Audio acquisition, media download, and retained audio cache require explicit user confirmation per stage. Runtime media artifacts belong under ignored `output/` or `cache/` paths.
 
@@ -146,7 +214,10 @@ Audio acquisition, media download, and retained audio cache require explicit use
 python -m unittest discover -s tests
 ```
 
-Current test baseline: `206` tests. The current Windows environment skips one
+Current test baseline: `257` tests, including the fully mocked
+`tests/test_local_asr_cli.py` coverage of the `transcribe-local` command and the
+offline model-resolution and tokenizer-guard coverage in
+`tests/test_whisper_backend.py`. The current Windows environment skips one
 platform-dependent symlink test when symlink creation is unavailable.
 
 ## Installation
@@ -164,14 +235,19 @@ python -m pip install -e ".[asr]"
 ```
 
 The `asr` extra installs the validated faster-whisper Python dependency. It
-does not add model files or model caches to the repository. The first run with
-a model name may access Hugging Face Hub and cache model files separately;
-cache location and lifecycle remain environment or future configuration
-concerns rather than a current product policy.
+does not add model files or model caches to the repository. Model files are
+acquired separately: `transcribe-local` loads models local-files-only unless
+`--allow-model-download` is passed, and only that flag lets faster-whisper reach
+Hugging Face Hub. In the default offline mode the backend resolves the model from
+an existing local directory or the existing Hub cache and requires a local
+`tokenizer.json` in the resolved directory, so a missing tokenizer cannot trigger
+a fallback download; a model that is not present locally fails with a stable
+error instead. Cache location and lifecycle remain environment or future
+configuration concerns rather than a current product policy.
 
-`FasterWhisperBackend` is currently available only as a code boundary. The CLI
-and `real-fallback` do not select it yet, so these installation commands do not
-enable an end-to-end real ASR CLI path or a supported local-ASR CLI command.
+`FasterWhisperBackend` is reachable through the explicit `transcribe-local`
+command. The default import pipeline and `real-fallback` still do not select
+it, so these installation commands do not change the default Mock path.
 
 ## Markdown Output
 

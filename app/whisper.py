@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, TypeVar
+from typing import Callable, Protocol, TypeVar
 
 from app.audio import NormalizedAudio
 from app.errors import LocalTranscriptionError
@@ -72,17 +72,19 @@ class FasterWhisperBackend:
         device: str = "auto",
         compute_type: str = "default",
         language: str | None = None,
+        local_files_only: bool = False,
     ) -> None:
         self.model_size = model_size
         self.device = device
         self.compute_type = compute_type
         self.language = language
+        self.local_files_only = local_files_only
 
     def transcribe(self, audio: NormalizedAudio) -> TranscriptResult:
         input_path = _validated_audio_path(audio)
 
         try:
-            from faster_whisper import WhisperModel
+            from faster_whisper import WhisperModel, download_model
         except ImportError:
             raise LocalTranscriptionError(
                 "faster-whisper is not installed"
@@ -90,11 +92,20 @@ class FasterWhisperBackend:
         except Exception:
             raise LocalTranscriptionError("local transcription failed") from None
 
+        if self.local_files_only:
+            loaded_model = _resolve_local_model_path(
+                self.model_size,
+                download_model,
+            )
+        else:
+            loaded_model = self.model_size
+
         try:
             model = WhisperModel(
-                self.model_size,
+                loaded_model,
                 device=self.device,
                 compute_type=self.compute_type,
+                local_files_only=self.local_files_only,
             )
             raw_segments, _info = model.transcribe(
                 str(input_path),
@@ -133,6 +144,42 @@ def _validated_audio_path(audio: NormalizedAudio) -> Path:
     if not input_path.is_file():
         raise LocalTranscriptionError("normalized audio input must be a file")
     return input_path
+
+
+def _resolve_local_model_path(
+    model_size: str,
+    download_model: Callable[..., str],
+) -> str:
+    """Resolve an offline model reference and require its tokenizer locally.
+
+    ``WhisperModel(local_files_only=True)`` only constrains the model-snapshot
+    download. If the resolved snapshot has no ``tokenizer.json``, the library
+    still calls ``Tokenizer.from_pretrained`` against the Hub, so this helper
+    resolves the model to a local directory first and refuses anything that
+    cannot serve its tokenizer from disk. Every failure is sanitized.
+    """
+
+    try:
+        model_path = Path(model_size)
+        if model_path.is_dir():
+            resolved_model = model_path
+        else:
+            # ``download_model(local_files_only=True)`` returns an existing
+            # cached snapshot, or raises when nothing is cached locally.
+            resolved_model = Path(
+                download_model(model_size, local_files_only=True)
+            )
+        tokenizer_path = resolved_model / "tokenizer.json"
+        # A directory named ``tokenizer.json`` is not a readable tokenizer file.
+        if not tokenizer_path.is_file():
+            raise LocalTranscriptionError("local transcription failed") from None
+        return str(resolved_model)
+    except LocalTranscriptionError:
+        raise
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:
+        raise LocalTranscriptionError("local transcription failed") from None
 
 
 def _format_timestamp(value: object) -> str:
