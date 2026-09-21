@@ -98,7 +98,7 @@ class FasterWhisperBackend:
                 download_model,
             )
         else:
-            loaded_model = self.model_size
+            loaded_model = _resolve_online_model_path(self.model_size)
 
         try:
             model = WhisperModel(
@@ -174,16 +174,38 @@ def _resolve_local_model_path(
                     use_auth_token=False,
                 )
             )
-        tokenizer_path = resolved_model / "tokenizer.json"
-        # A directory named ``tokenizer.json`` is not a readable tokenizer file.
-        if not tokenizer_path.is_file():
-            raise LocalTranscriptionError("local transcription failed") from None
+        _require_local_tokenizer(resolved_model)
         return str(resolved_model)
     except LocalTranscriptionError:
         raise
     except (KeyboardInterrupt, SystemExit):
         raise
     except Exception:
+        raise LocalTranscriptionError("local transcription failed") from None
+
+
+def _resolve_online_model_path(model_size: str) -> str:
+    """Reject incomplete local model directories before upstream construction."""
+
+    try:
+        model_path = Path(model_size)
+        if not model_path.is_dir():
+            return model_size
+        _require_local_tokenizer(model_path)
+        return str(model_path)
+    except LocalTranscriptionError:
+        raise
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:
+        raise LocalTranscriptionError("local transcription failed") from None
+
+
+def _require_local_tokenizer(model_path: Path) -> None:
+    """Require the local tokenizer needed to keep a directory self-contained."""
+
+    tokenizer_path = model_path / "tokenizer.json"
+    if not tokenizer_path.is_file():
         raise LocalTranscriptionError("local transcription failed") from None
 
 

@@ -126,6 +126,10 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - `YtDlpAudioProvider` is YouTube-only, defaults to disabled, produces temporary audio artifacts, and is not connected to `real-fallback`.
 - AudioWorkspace removes only registered temporary files in its private directory; it does not delete local user files or unknown workspace content.
 - `FasterWhisperBackend` validates local normalized audio before importing its optional dependency, does not expose local paths or raw runtime failures, and is not connected to `real-fallback`.
+- The explicit `transcribe-local` CLI is implemented for one user-owned local
+  media file. It is not selected by the default import pipeline or
+  `real-fallback`, and a real CLI smoke test remains pending separate user
+  authorization.
 - Base installation does not include faster-whisper. The optional `asr` extra installs the pinned Python dependency but not model files; model cache policy remains separate and unresolved.
 - `transcribe_local_media` accepts only local metadata and an existing regular
   `temporary=False` user-owned source artifact; temporary or network acquisition

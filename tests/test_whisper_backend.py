@@ -282,6 +282,32 @@ class FasterWhisperBackendTests(unittest.TestCase):
         _assert_sanitized_traceback(self, context.exception)
         self.assertNotIn("user-model", str(context.exception))
 
+    def test_online_local_model_directory_without_tokenizer_is_rejected_before_model_construction(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_model_path = Path(temp_dir) / "incomplete-user-model"
+            local_model_path.mkdir()
+            fake_module, _ = _fake_faster_whisper_module(
+                [_segment(0.0, 1.0, "text")]
+            )
+            fake_module.WhisperModel.side_effect = AssertionError(
+                "incomplete local model must not reach upstream"
+            )
+            with _temporary_audio() as audio:
+                with mock.patch.dict(sys.modules, {"faster_whisper": fake_module}):
+                    with self.assertRaises(LocalTranscriptionError) as context:
+                        FasterWhisperBackend(
+                            model_size=str(local_model_path),
+                            local_files_only=False,
+                        ).transcribe(audio)
+
+            fake_module.download_model.assert_not_called()
+            fake_module.WhisperModel.assert_not_called()
+
+        self.assertEqual(str(context.exception), "local transcription failed")
+        _assert_sanitized_traceback(self, context.exception)
+
     def test_offline_resolution_failure_is_rejected_before_model_construction(
         self,
     ) -> None:

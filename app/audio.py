@@ -172,7 +172,7 @@ class LocalFileAudioProvider:
         try:
             mode = input_path.stat().st_mode
         except FileNotFoundError:
-            raise AudioAcquisitionError("local audio input file not found")
+            raise AudioAcquisitionError("local audio input file not found") from None
         except OSError:
             raise AudioAcquisitionError("local audio input inaccessible") from None
         if not S_ISREG(mode):

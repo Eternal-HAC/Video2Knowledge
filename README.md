@@ -214,7 +214,7 @@ Audio acquisition, media download, and retained audio cache require explicit use
 python -m unittest discover -s tests
 ```
 
-Current test baseline: `257` tests, including the fully mocked
+Current test baseline: `261` tests, including the fully mocked
 `tests/test_local_asr_cli.py` coverage of the `transcribe-local` command and the
 offline model-resolution and tokenizer-guard coverage in
 `tests/test_whisper_backend.py`. The current Windows environment skips one
