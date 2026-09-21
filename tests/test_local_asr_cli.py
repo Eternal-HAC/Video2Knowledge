@@ -14,6 +14,7 @@ import io
 import json
 import os
 import tempfile
+import traceback
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -276,6 +277,37 @@ class LocalAsrCliInputTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         resolve.assert_called_once_with(str(input_path))
+
+    def test_inaccessible_user_file_is_sanitized_through_cli_orchestration(self) -> None:
+        private_path = r"C:\private\media\secret-recording.m4a"
+        stat_error = PermissionError(f"access denied: {private_path}")
+
+        with mock.patch.object(Path, "stat", side_effect=stat_error):
+            with self.assertRaises(AudioAcquisitionError) as context:
+                run_transcribe_local(private_path)
+
+        formatted = "".join(
+            traceback.format_exception(
+                type(context.exception),
+                context.exception,
+                context.exception.__traceback__,
+            )
+        )
+        self.assertEqual(str(context.exception), "local audio input inaccessible")
+        self.assertIsNone(context.exception.__cause__)
+        self.assertTrue(context.exception.__suppress_context__)
+        self.assertNotIn(private_path, formatted)
+        self.assertNotIn("access denied", formatted)
+
+        with mock.patch.object(Path, "stat", side_effect=stat_error):
+            exit_code, stdout, stderr = _run_cli(["transcribe-local", private_path])
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout, "")
+        self.assertEqual(stderr, "Error: local audio input inaccessible\n")
+        self.assertNotIn(private_path, stderr)
+        self.assertNotIn("access denied", stderr)
+        self.assertNotIn("Traceback", stderr)
 
     def test_neutral_metadata_is_built_privately(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

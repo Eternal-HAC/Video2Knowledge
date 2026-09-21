@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import socket
+from stat import S_ISREG
 import subprocess
 import tempfile
 from typing import Protocol
@@ -168,9 +169,13 @@ class LocalFileAudioProvider:
             raise AudioAcquisitionError("local audio input required")
 
         input_path = Path(metadata.source_url)
-        if not input_path.exists():
+        try:
+            mode = input_path.stat().st_mode
+        except FileNotFoundError:
             raise AudioAcquisitionError("local audio input file not found")
-        if not input_path.is_file():
+        except OSError:
+            raise AudioAcquisitionError("local audio input inaccessible") from None
+        if not S_ISREG(mode):
             raise AudioAcquisitionError("local audio input must be a file")
 
         return AudioArtifact(

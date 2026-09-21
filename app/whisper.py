@@ -106,6 +106,7 @@ class FasterWhisperBackend:
                 device=self.device,
                 compute_type=self.compute_type,
                 local_files_only=self.local_files_only,
+                use_auth_token=False,
             )
             raw_segments, _info = model.transcribe(
                 str(input_path),
@@ -167,7 +168,11 @@ def _resolve_local_model_path(
             # ``download_model(local_files_only=True)`` returns an existing
             # cached snapshot, or raises when nothing is cached locally.
             resolved_model = Path(
-                download_model(model_size, local_files_only=True)
+                download_model(
+                    model_size,
+                    local_files_only=True,
+                    use_auth_token=False,
+                )
             )
         tokenizer_path = resolved_model / "tokenizer.json"
         # A directory named ``tokenizer.json`` is not a readable tokenizer file.

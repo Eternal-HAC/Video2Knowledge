@@ -4,6 +4,7 @@ import contextlib
 import hashlib
 import subprocess
 import tempfile
+import traceback
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -198,6 +199,39 @@ class LocalAsrOrchestrationTests(unittest.TestCase):
                 "local audio input must be a file",
             )
             workspace.assert_not_called()
+
+    def test_source_stat_failure_is_sanitized_before_workspace(self) -> None:
+        private_path = r"C:\private\media\secret-recording.m4a"
+        with _local_input() as (metadata, original_path):
+            provider = mock.Mock()
+            provider.acquire.return_value = _audio_artifact(original_path)
+            with mock.patch.object(
+                Path,
+                "stat",
+                side_effect=PermissionError(f"access denied: {private_path}"),
+            ):
+                with mock.patch("app.pipeline.AudioWorkspace") as workspace:
+                    with self.assertRaises(AudioAcquisitionError) as context:
+                        transcribe_local_media(
+                            metadata,
+                            whisper_backend=mock.Mock(),
+                            audio_provider=provider,
+                            normalizer_factory=mock.Mock(),
+                        )
+
+        formatted = "".join(
+            traceback.format_exception(
+                type(context.exception),
+                context.exception,
+                context.exception.__traceback__,
+            )
+        )
+        self.assertEqual(str(context.exception), "local audio input inaccessible")
+        self.assertIsNone(context.exception.__cause__)
+        self.assertTrue(context.exception.__suppress_context__)
+        self.assertNotIn(private_path, formatted)
+        self.assertNotIn("access denied", formatted)
+        workspace.assert_not_called()
 
     def test_normalizer_failure_stops_before_whisper(self) -> None:
         with _local_input() as (metadata, original_path):

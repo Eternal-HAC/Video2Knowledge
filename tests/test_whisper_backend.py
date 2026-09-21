@@ -117,6 +117,7 @@ class FasterWhisperBackendTests(unittest.TestCase):
             device="cuda",
             compute_type="float16",
             local_files_only=False,
+            use_auth_token=False,
         )
         model.transcribe.assert_called_once_with(input_path, language="zh")
         self.assertEqual(result.provider, FASTER_WHISPER_PROVIDER_ID)
@@ -135,6 +136,7 @@ class FasterWhisperBackendTests(unittest.TestCase):
             device="auto",
             compute_type="default",
             local_files_only=False,
+            use_auth_token=False,
         )
 
     def test_local_files_only_override_passes_through(self) -> None:
@@ -157,12 +159,14 @@ class FasterWhisperBackendTests(unittest.TestCase):
             fake_module.download_model.assert_called_once_with(
                 "small",
                 local_files_only=True,
+                use_auth_token=False,
             )
             fake_module.WhisperModel.assert_called_once_with(
                 str(resolved_model_path),
                 device="cpu",
                 compute_type="int8",
                 local_files_only=True,
+                use_auth_token=False,
             )
         self.assertTrue(backend.local_files_only)
 
@@ -186,12 +190,14 @@ class FasterWhisperBackendTests(unittest.TestCase):
             fake_module.download_model.assert_called_once_with(
                 "small",
                 local_files_only=True,
+                use_auth_token=False,
             )
             fake_module.WhisperModel.assert_called_once_with(
                 str(resolved_model_path),
                 device="cpu",
                 compute_type="int8",
                 local_files_only=True,
+                use_auth_token=False,
             )
             model.transcribe.assert_called_once_with(input_path, language=None)
 
@@ -226,6 +232,7 @@ class FasterWhisperBackendTests(unittest.TestCase):
                 device="cpu",
                 compute_type="int8",
                 local_files_only=True,
+                use_auth_token=False,
             )
 
     def test_offline_resolved_model_without_tokenizer_is_rejected(self) -> None:
@@ -348,6 +355,7 @@ class FasterWhisperBackendTests(unittest.TestCase):
                 device="cpu",
                 compute_type="int8",
                 local_files_only=False,
+                use_auth_token=False,
             )
             model.transcribe.assert_called_once_with(input_path, language=None)
 

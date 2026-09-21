@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from stat import S_ISREG
 
 from app.audio import (
     AudioArtifact,
@@ -96,9 +97,14 @@ def _validate_local_original_artifact(artifact: object) -> None:
 
     if not isinstance(artifact, AudioArtifact) or artifact.temporary:
         raise AudioAcquisitionError("local audio input must be user-owned")
-    if not artifact.path.exists():
-        raise AudioAcquisitionError("local audio input file not found")
-    if artifact.path.is_symlink() or not artifact.path.is_file():
+    try:
+        mode = artifact.path.stat().st_mode
+        is_symlink = artifact.path.is_symlink()
+    except FileNotFoundError:
+        raise AudioAcquisitionError("local audio input file not found") from None
+    except OSError:
+        raise AudioAcquisitionError("local audio input inaccessible") from None
+    if is_symlink or not S_ISREG(mode):
         raise AudioAcquisitionError("local audio input must be a file")
 
 

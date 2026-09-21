@@ -98,7 +98,6 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - Retained-cache behavior.
 - ffmpeg integration into the default fallback path.
 - Pipeline and `real-fallback` integration of the validated faster-whisper backend.
-- Explicit local ASR CLI entry point.
 - YAML Frontmatter hardening.
 - Template packaging and resource-path hardening.
 - Exporter collision and overwrite policy.
@@ -181,7 +180,7 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 
 1. Add separately approved audio cache retention.
 2. Keep the existing default `real-fallback` Mock-only until a separate integration stage is approved.
-3. Keep local-file ASR orchestration disconnected from CLI and `real-fallback` until a separate integration stage is approved.
+3. Keep local-file ASR orchestration disconnected from `real-fallback` until a separate integration stage is approved.
 4. Keep Transcript API fallback, LLM extraction, and export expansion in separate stages.
 
 ## Live Validation Notes
