@@ -371,3 +371,33 @@
   `real-fallback`, YouTube audio acquisition, retained cache, model-cache
   lifecycle, detected language, LLM extraction, Markdown, and export behavior
   are unchanged.
+
+## 2026-09-26
+
+- Hardened the Markdown artifact boundaries without changing the pipeline,
+  provider, ASR, or CLI behavior:
+- YAML Frontmatter scalars and tag elements now serialize through one safe
+  standard-library-only path (YAML double-quoted style with escapes), so
+  colons, hashes, quotes, newlines, Unicode, and `true`/`null`/date/number-
+  looking strings stay readable by standard YAML parsers and keep their string
+  type. Empty strings render as `""`, absent values as `null`, and empty tag
+  lists as `[]`; `raw_metadata` still never reaches the note.
+- The default note template is now a packaged resource (`app/templates/`)
+  located through `importlib.resources`, independent of the working directory
+  and present in built distributions. An explicit custom `template_path` is
+  still honored verbatim, and a missing custom template raises
+  `FileNotFoundError` instead of silently falling back.
+- The local exporter no longer silently overwrites existing notes: the first
+  export uses the normalized base name, collisions get stable `-2`, `-3`, ...
+  suffixes, each file is created with exclusive `O_CREAT | O_EXCL` semantics,
+  the returned path is the file actually written, and a failed write raises
+  after best-effort removal of the partial file it created.
+- Added 25 fully offline tests in `tests/test_markdown_artifact.py`; the full
+  suite passes 286 tests with one pre-existing platform-dependent skip. PyYAML
+  is used in tests only when already installed, to prove standard-parser
+  readability; it is not a project dependency.
+- Validated the packaged template through an offline
+  `pip install . --no-deps --no-build-isolation --target <tempdir>` check that
+  rendered a complete note from the installed location under a foreign working
+  directory. No network access, provider call, ffmpeg, faster-whisper, model
+  download, or dependency change occurred.

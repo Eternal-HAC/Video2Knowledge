@@ -1028,3 +1028,89 @@ exercised without network access, when a transcript artifact or naming contract
 is approved, when model-cache location and lifecycle become a product policy,
 when detected language or silence semantics need a result field, or when a real
 ffmpeg/faster-whisper path is wired into `real-fallback`.
+
+## 2026-09-26
+
+### Markdown Artifact Reliability Decisions
+
+Decision:
+Harden the Markdown artifact boundaries with standard-library-only mechanics:
+YAML double-quoted scalars for every Frontmatter value, a packaged default
+template located through `importlib.resources`, and exclusive-create export
+with stable numeric suffixes.
+
+1. All Frontmatter scalars (title, platform, URLs, ids, author, dates,
+   duration, language, status) and every tag element serialize through one
+   `_format_yaml_scalar` helper that emits YAML double-quoted style with the
+   escape sequences YAML defines (`\\`, `\"`, `\n`, `\r`, `\t`, `\xXX`).
+   `None` becomes the plain `null` scalar, an empty tag list becomes `[]`, and
+   the description keeps its `|-` block scalar with every line indented. No
+   new dependency is introduced; generation never relies on a YAML library.
+2. The default template ships as package data under `app/templates/` and is
+   read through `importlib.resources`, so rendering no longer depends on the
+   current working directory or the repository root, and built distributions
+   carry the resource. An explicit `template_path` is read verbatim; a missing
+   or unreadable custom template raises the natural `OSError` (e.g.
+   `FileNotFoundError`) and never silently falls back to the default. The
+   repo-root `templates/video_note.md.j2` remains in place with identical
+   content as the development reference, pinned to the packaged copy by a
+   sync test.
+3. `export_markdown` creates each candidate file with
+   `os.open(O_WRONLY | O_CREAT | O_EXCL)`. A collision retries with
+   `-2`, `-3`, ... suffixes; the function returns the path it actually wrote;
+   write failures propagate after best-effort removal of the partial file
+   this call exclusively created. Pre-existing files are never opened for
+   writing, so there is no check-then-write race window.
+
+Rationale:
+
+The Frontmatter was previously assembled by embedding raw strings inside the
+template's quotes, and tag lists were quoted without escaping, so quotes,
+newlines, or YAML-special values in provider-controlled metadata could break
+the note or change field types. The default template was a cwd-relative path
+invisible to packaging, and the exporter used plain `write_text`, silently
+overwriting earlier notes. These are artifact-reliability defects in the
+durable output contract, independent of any provider stage, and had to be
+closed before LLM extraction or export expansion builds on top of them.
+
+Double-quoted style was chosen over plain or single-quoted scalars because it
+has the smallest, fully standardized escape set and keeps string type for
+values that resemble booleans, nulls, timestamps, or numbers. The block
+scalar was kept for `description` because it is the readable multi-line form
+and remains safe as long as every content line is indented, which the
+formatter guarantees. Exclusive creation was chosen over
+check-then-write because only the operating system's create-exclusive
+primitive closes the race window without a lock file; the suffix loop
+terminates because each candidate name is distinct.
+
+Alternatives:
+
+Use PyYAML for Frontmatter emission. Rejected: it adds a runtime dependency
+for a small, fixed field set, and the project standard-library-only decision
+for the core artifact path still stands.
+
+Load the default template from the repository root with a path relative to
+`__file__` or the cwd. Rejected: `__file__`-relative traversal breaks for
+zip/installed layouts, and cwd dependence was the defect being fixed.
+
+Return an error on collision instead of suffixing, or prompt. Rejected: the
+CLI contract has no interactive surface, and silently choosing between
+failure and data loss is worse than a deterministic stable name; suffixing
+matches the existing `output/markdown` folder workflow.
+
+Impact:
+
+`app/markdown_writer.py`, `app/exporter/obsidian.py`, new `app/templates/`
+package resource, `pyproject.toml` package-data only, the repo-root template
+content, and `tests/test_markdown_artifact.py` (25 fully offline tests; full
+suite 286 with one pre-existing skip). `app/pipeline.py`, CLI, providers,
+ASR, and transcript behavior are unchanged. PyYAML appears in tests only as
+an optional readability oracle when already installed. An offline installed
+package check (`pip install . --no-deps --no-build-isolation --target
+<tempdir>`) confirmed the resource is present in built distributions and
+renders under a foreign cwd. No network access or dependency change occurred.
+
+Follow-up Review:
+Revisit if the project adopts a real template engine or a YAML library for
+the core path, or if export gains batch/update semantics that need a
+different collision policy.

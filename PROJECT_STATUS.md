@@ -911,3 +911,58 @@ Remaining boundaries:
   extraction, Markdown, and export behavior are unchanged.
 - `TranscriptResult` still has no language field, so a detected language cannot
   be reported even though a requested language is passed to the backend.
+
+## 2026-09-26 Markdown Artifact Reliability Hardening
+
+Status: Markdown artifact reliability hardening implementation complete.
+
+What changed:
+
+- YAML Frontmatter hardening: every scalar field and every tag element now
+  serializes through one safe standard-library-only path (YAML double-quoted
+  style with escapes), so colons, hashes, quotes, newlines, Unicode, and
+  `true`/`null`/date/number-looking strings remain readable by standard YAML
+  parsers and keep their string type. Empty strings render as `""`, absent
+  values as `null`, empty tag lists as `[]`, and the description keeps its
+  `|-` block scalar with indented lines. `raw_metadata` still never reaches
+  the note.
+- Template packaging: the default note template is now packaged data under
+  `app/templates/` and located through `importlib.resources`, independent of
+  the working directory and present in built distributions. Custom
+  `template_path` values are honored verbatim; a missing custom template
+  raises `FileNotFoundError` without silently falling back.
+- Export collision safety: the exporter creates each note with exclusive
+  `O_CREAT | O_EXCL` semantics, appends stable `-2`, `-3`, ... suffixes on
+  collision, returns the path actually written, and raises after best-effort
+  removal of a partial file it created. Existing notes are never overwritten.
+
+Validation:
+
+- `tests/test_markdown_artifact.py` adds 25 fully offline tests covering
+  YAML-special-character round trips (verified against PyYAML when already
+  installed, without adding a dependency), foreign-cwd and package-resource
+  template loading, custom template success and stable failure, and export
+  collision, failure, and concurrency behavior.
+- `python -m unittest tests.test_markdown_artifact`: 25 tests, OK.
+- `python -m unittest discover -s tests`: 286 tests, 285 passed, 1 skipped
+  (the pre-existing Windows symlink-privilege case).
+- Mock CLI regression passed with the default Mock providers.
+- An offline `pip install . --no-deps --no-build-isolation --target
+  <tempdir>` check confirmed the packaged template is present in built
+  distributions and renders a complete note under a foreign working
+  directory.
+- `python -m compileall -q app tests` and `git diff --check` passed.
+- No network access, provider call, ffmpeg, faster-whisper, model download,
+  media download, or dependency change occurred.
+
+Remaining boundaries:
+
+- Import-url and transcribe-local command surfaces, exit codes, provider
+  selection, fallback eligibility, and `TranscriptResult` behavior are
+  unchanged.
+- The collision suffix policy is deterministic but not content-aware; two
+  different videos with the same normalized title always suffix rather than
+  merge or update.
+- PyYAML-based readability assertions run only when PyYAML is already
+  installed; without it, the serializer's exact output is still asserted
+  directly.

@@ -214,11 +214,14 @@ Audio acquisition, media download, and retained audio cache require explicit use
 python -m unittest discover -s tests
 ```
 
-Current test baseline: `261` tests, including the fully mocked
+Current test baseline: `286` tests, including the fully mocked
 `tests/test_local_asr_cli.py` coverage of the `transcribe-local` command and the
 offline model-resolution and tokenizer-guard coverage in
-`tests/test_whisper_backend.py`. The current Windows environment skips one
-platform-dependent symlink test when symlink creation is unavailable.
+`tests/test_whisper_backend.py`, plus the Markdown artifact reliability coverage
+in `tests/test_markdown_artifact.py` (safe YAML Frontmatter serialization,
+cwd-independent template resources, and non-overwriting export semantics). The
+current Windows environment skips one platform-dependent symlink test when
+symlink creation is unavailable.
 
 ## Installation
 
@@ -259,6 +262,24 @@ Generated notes contain YAML Frontmatter and these sections:
 - 技术术语
 - 可执行事项
 - 原始转录（带时间戳）
+
+Frontmatter scalars and tag elements are serialized through one safe
+standard-library-only path (YAML double-quoted style), so titles, authors,
+URLs, tags, and descriptions containing colons, hashes, quotes, newlines,
+Unicode, or values that merely look like booleans, nulls, dates, or numbers
+remain readable by standard YAML parsers and keep their string type.
+`raw_metadata` is never rendered into the note.
+
+The default note template is a packaged resource (`app/templates/`) located
+through `importlib.resources`, so rendering works from any working directory
+and from installed copies; a custom `template_path` is still supported and a
+missing custom template fails with `FileNotFoundError` instead of silently
+falling back to the default.
+
+Export never silently overwrites an existing note: the first export uses the
+normalized base name and collisions receive stable `-2`, `-3`, ... suffixes.
+Each file is created with exclusive semantics, and the exporter returns the
+path it actually wrote.
 
 For yt-dlp metadata, `raw_metadata` retains only the minimal in-memory provider
 and official-subtitle mapping required by the official subtitle provider. It is

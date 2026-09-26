@@ -2,7 +2,7 @@
 
 ## Snapshot Date
 
-2026-09-19
+2026-09-26
 
 ## Current Version
 
@@ -16,7 +16,7 @@ Video2Knowledge is a Local First video-to-knowledge pipeline that converts suppo
 
 ## Current Stage
 
-The latest tagged release is `v0.4.0 Official Transcript`. Development is currently in `v0.5.x Whisper Fallback`, with policy, Mock fallback, audio boundaries, cache safety, local ffmpeg normalization, workspace cleanup, the faster-whisper backend boundary, standalone CPU transcription, non-CLI local-file-to-ASR integration, and provider input/error boundary hardening plus its reviewed remediation, authority-normalization follow-up, provider boundary finalization, and provider boundary closure validated offline.
+The latest tagged release is `v0.4.0 Official Transcript`. Development is currently in `v0.5.x Whisper Fallback`, with policy, Mock fallback, audio boundaries, cache safety, local ffmpeg normalization, workspace cleanup, the faster-whisper backend boundary, standalone CPU transcription, non-CLI local-file-to-ASR integration, provider input/error boundary hardening plus its reviewed remediation, authority-normalization follow-up, provider boundary finalization, provider boundary closure, the explicit `transcribe-local` CLI, and Markdown artifact reliability hardening (safe YAML Frontmatter serialization, packaged cwd-independent template resources, and non-overwriting export) validated offline.
 
 ## Completed
 
@@ -85,6 +85,18 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
   successful redirect result, or a propagating `KeyboardInterrupt`/`SystemExit`
   (which still propagate, and whose close text still never reaches a public
   error or traceback). Offline evidence only, on the same terms as above.
+- Markdown artifact reliability hardening: every YAML Frontmatter scalar and
+  tag element serializes through one safe standard-library-only path (YAML
+  double-quoted style with escapes), so special characters and
+  boolean/null/date/number-looking values stay string-typed and standard-YAML
+  readable; the default note template is packaged data under `app/templates/`
+  located through `importlib.resources`, independent of the working directory
+  and present in built distributions, with custom template paths honored
+  verbatim and stable `FileNotFoundError` failure; and the local exporter
+  creates notes exclusively (`O_CREAT | O_EXCL`) with stable `-2`, `-3`, ...
+  suffixes on collision, returning the path actually written and never
+  overwriting existing notes. Proven by 25 fully offline tests plus an
+  offline installed-package render check.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
   - `v0.2.0`: architecture stable baseline.
@@ -98,9 +110,6 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - Retained-cache behavior.
 - ffmpeg integration into the default fallback path.
 - Pipeline and `real-fallback` integration of the validated faster-whisper backend.
-- YAML Frontmatter hardening.
-- Template packaging and resource-path hardening.
-- Exporter collision and overwrite policy.
 - LLM providers.
 - Obsidian automation.
 - Notion export.
@@ -176,6 +185,17 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - Unknown charsets and decode failures map to stable sanitized transcript
   errors; public subtitle fetch errors never retain an underlying exception
   cause; `KeyboardInterrupt` and `SystemExit` propagate unchanged.
+- YAML Frontmatter scalars and tag elements serialize through one safe
+  standard-library-only path (YAML double-quoted style with escapes), so
+  provider-controlled titles, authors, URLs, and tags cannot break the note
+  or change field types; `raw_metadata` never reaches the note.
+- The default note template is packaged data under `app/templates/`, located
+  through `importlib.resources` and independent of the working directory;
+  custom template paths are honored verbatim, and a missing custom template
+  fails with `FileNotFoundError` instead of silently falling back.
+- The local exporter creates notes with exclusive `O_CREAT | O_EXCL`
+  semantics, appends stable `-2`, `-3`, ... suffixes on collision, returns
+  the path actually written, and never overwrites an existing note.
 - All of the above is evidenced by fully offline unit tests. No live network,
   provider, or media validation backs this section, and DNS rebinding plus
   resolver-level differences remain outside the current capability.

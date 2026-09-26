@@ -94,9 +94,9 @@
 - [ ] Run a separately confirmed real `transcribe-local` CLI smoke test.
 - [ ] Add transcript API fallback.
 - [ ] Add local Whisper fallback.
-- [ ] Add YAML Frontmatter hardening.
-- [ ] Add template packaging and resource-path hardening.
-- [ ] Add exporter collision and overwrite policy.
+- [x] Add YAML Frontmatter hardening.
+- [x] Add template packaging and resource-path hardening.
+- [x] Add exporter collision and overwrite policy.
 - [ ] Add configurable LLM summarizer.
 - [ ] Add Obsidian import workflow.
 

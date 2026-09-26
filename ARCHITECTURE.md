@@ -81,6 +81,15 @@ raw input
 - `audio` provides Mock audio boundaries and a real ffmpeg normalizer for existing local files.
 - `whisper` provides the deterministic Mock local backend and a lazy optional
   `FasterWhisperBackend` boundary for existing normalized audio.
+- The Markdown writer serializes every YAML Frontmatter scalar and tag
+  element through one safe standard-library-only path (YAML double-quoted
+  style with escapes), loads the default note template through
+  `importlib.resources` from the packaged `app/templates` data so rendering
+  is independent of the working directory, and honors explicit custom
+  template paths verbatim with stable failure when one is missing. The local
+  exporter creates notes exclusively (`O_CREAT | O_EXCL`), appends stable
+  `-2`, `-3`, ... suffixes on collision, and returns the path actually
+  written; it never overwrites an existing note.
 - The CLI remains compatible with `python -m app.cli import-url ...`.
 
 Implemented provider boundaries have narrow responsibilities:
