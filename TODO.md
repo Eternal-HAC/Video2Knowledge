@@ -98,7 +98,8 @@
 - [x] Add template packaging and resource-path hardening.
 - [x] Add exporter collision and overwrite policy.
 - [x] Close Markdown serialization review gaps (one-pass template rendering,
-      quoted description values, and control/Unicode separator round trips).
+      quoted description values, complete task-scoped Unicode round trips,
+      UTF-8-safe body text, and encoding-failure cleanup).
 - [ ] Add configurable LLM summarizer.
 - [ ] Add Obsidian import workflow.
 

@@ -12,7 +12,11 @@
 - Added four adversarial regression tests for placeholder-like content,
   leading whitespace, control/separator characters, non-BMP text, and lone
   surrogates; corrected write-failure and Windows filename tests.
-- Full offline suite: 290 tests, 289 passed, 1 pre-existing Windows symlink
+- Follow-up review added U+FFFE/U+FFFF escaping, preserved the legacy custom
+  description block context, removed an accidental PyYAML test dependency,
+  made Markdown body fields UTF-8 safe for lone surrogates, and cleaned partial
+  exports on `UnicodeError`.
+- Full offline suite: 294 tests, 293 passed, 1 pre-existing Windows symlink
   test skipped. Mock CLI, `compileall`, and `git diff --check` passed.
 
 ## 2026-07-05

@@ -161,6 +161,7 @@ class FrontmatterSerializationTests(unittest.TestCase):
         self.assertNotIn("debug_secret", markdown)
         self.assertNotIn("raw metadata should stay out", markdown)
 
+    @_REQUIRES_YAML
     def test_description_round_trips_with_leading_space_and_raw_metadata_stays_out(self) -> None:
         description = '  Line one: has a colon\nLine two has "double quotes"'
         markdown = _render(
@@ -220,6 +221,36 @@ class FrontmatterSerializationTests(unittest.TestCase):
         self.assertEqual(parsed["title"], title)
         self.assertEqual(parsed["description"], surrogate_value)
         markdown.encode("utf-8")
+
+    @_REQUIRES_YAML
+    def test_yaml_noncharacters_round_trip(self) -> None:
+        value = "noncharacters:\ufffe\uffff:end"
+        markdown = _render(title=value, description=value, tags=[value])
+
+        parsed = yaml.safe_load(_frontmatter_text(markdown))
+
+        self.assertEqual(parsed["title"], value)
+        self.assertEqual(parsed["description"], value)
+        self.assertEqual(parsed["tags"], [value])
+
+    def test_body_lone_surrogates_are_rendered_as_utf8_safe_escapes(self) -> None:
+        metadata = _metadata_with(title="title:\ud800")
+        transcript = [
+            TranscriptSegment("00:00:00.000", "00:00:01.000", "text:\ud801")
+        ]
+        summary = Summary(
+            one_sentence_summary="summary:\ud802",
+            core_ideas=["idea:\ud803"],
+            knowledge_points=[],
+            technical_terms=[],
+            action_items=[],
+        )
+
+        markdown = render_markdown(metadata, transcript, summary)
+
+        markdown.encode("utf-8")
+        for escaped in ["\\uD800", "\\uD801", "\\uD802", "\\uD803"]:
+            self.assertIn(escaped, markdown)
 
     def test_generated_content_placeholders_are_not_reinterpreted(self) -> None:
         metadata = _metadata_with()
@@ -282,6 +313,23 @@ class TemplateResolutionTests(unittest.TestCase):
 
         self.assertIn('TITLE="Mock Video Knowledge Note"', markdown)
         self.assertIn("BODY=Mock Video Knowledge Note", markdown)
+
+    @_REQUIRES_YAML
+    def test_legacy_description_block_context_remains_compatible(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            template_path = Path(temp_dir) / "legacy.j2"
+            template_path.write_text(
+                "---\ndescription: |-\n{{ description }}\n---\n",
+                encoding="utf-8",
+            )
+            metadata = _metadata_with(description="line one\nline two")
+            transcript = get_mock_transcript(metadata)
+            summary = summarize_mock(metadata, transcript)
+
+            markdown = render_markdown(metadata, transcript, summary, template_path)
+
+        parsed = yaml.safe_load(_frontmatter_text(markdown))
+        self.assertEqual(parsed["description"], metadata.description)
 
     def test_missing_explicit_template_fails_without_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -394,6 +442,13 @@ class ExportCollisionTests(unittest.TestCase):
             ):
                 with self.assertRaises(OSError):
                     export_markdown("payload", "Mock Video", temp_dir)
+
+            self.assertEqual(list(Path(temp_dir).iterdir()), [])
+
+    def test_unicode_encoding_failure_is_cleaned_up_and_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(UnicodeEncodeError):
+                export_markdown("bad\ud800content", "Mock Video", temp_dir)
 
             self.assertEqual(list(Path(temp_dir).iterdir()), [])
 

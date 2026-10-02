@@ -96,7 +96,8 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
   verbatim and stable `FileNotFoundError` failure; and the local exporter
   creates notes exclusively (`O_CREAT | O_EXCL`) with stable `-2`, `-3`, ...
   suffixes on collision, returning the path actually written and never
-  overwriting existing notes. Proven by 29 fully offline tests plus an
+  overwriting existing notes. Body lone surrogates become visible escapes and
+  encoding failures clean their partial export. Proven by 33 fully offline tests plus an
   offline installed-package render check.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.

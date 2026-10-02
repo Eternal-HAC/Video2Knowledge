@@ -63,7 +63,8 @@ def _build_context(
     context.update(
         {
             "tags": _format_yaml_list(metadata.tags),
-            "one_sentence_summary": summary.one_sentence_summary,
+            "description": _format_yaml_block(metadata.description),
+            "one_sentence_summary": _as_text(summary.one_sentence_summary),
             "core_ideas": _format_bullets(summary.core_ideas),
             "knowledge_points": _format_bullets(summary.knowledge_points),
             "technical_terms": _format_bullets(summary.technical_terms),
@@ -100,7 +101,11 @@ def _read_template(template_path: Path | str | None) -> str:
 
 
 def _as_text(value: object) -> str:
-    return "" if value is None else str(value)
+    text = "" if value is None else str(value)
+    return "".join(
+        f"\\u{ord(char):04X}" if 0xD800 <= ord(char) <= 0xDFFF else char
+        for char in text
+    )
 
 
 def _render_template_once(template: str, context: dict[str, str]) -> str:
@@ -139,7 +144,7 @@ def _format_yaml_scalar(value: object) -> str:
             escaped.append(json.dumps(char, ensure_ascii=True)[1:-1])
         elif (
             0x7F <= codepoint <= 0x9F
-            or codepoint in {0x2028, 0x2029}
+            or codepoint in {0x2028, 0x2029, 0xFFFE, 0xFFFF}
             or 0xD800 <= codepoint <= 0xDFFF
         ):
             escaped.append(f"\\u{codepoint:04X}")
@@ -154,11 +159,27 @@ def _format_yaml_list(items: list[str]) -> str:
     return "[" + ", ".join(_format_yaml_scalar(item) for item in items) + "]"
 
 
+def _format_yaml_block(value: str) -> str:
+    """Preserve the legacy custom-template ``description`` context.
+
+    The packaged template uses ``description_yaml``. This indented form stays
+    available only for existing custom templates that still place
+    ``{{ description }}`` below a block-scalar header.
+    """
+
+    text = _as_text(value)
+    if not text:
+        return "  "
+    return "\n".join(f"  {line}" if line else "  " for line in text.splitlines())
+
+
 def _format_bullets(items: list[str]) -> str:
-    return "\n".join(f"- {item}" for item in items)
+    return "\n".join(f"- {_as_text(item)}" for item in items)
 
 
 def _format_transcript(segments: list[TranscriptSegment]) -> str:
     return "\n".join(
-        f"- [{segment.start} - {segment.end}] {segment.text}" for segment in segments
+        f"- [{_as_text(segment.start)} - {_as_text(segment.end)}] "
+        f"{_as_text(segment.text)}"
+        for segment in segments
     )

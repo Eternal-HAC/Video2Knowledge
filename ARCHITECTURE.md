@@ -92,6 +92,9 @@ raw input
   exporter creates notes exclusively (`O_CREAT | O_EXCL`), appends stable
   `-2`, `-3`, ... suffixes on collision, and returns the path actually
   written; it never overwrites an existing note.
+- Markdown body fields render lone surrogates as visible `\uXXXX` escapes so
+  the final note remains UTF-8 encodable. The exporter treats encoding failures
+  like write failures and removes only the partial file it exclusively created.
 - The CLI remains compatible with `python -m app.cli import-url ...`.
 
 Implemented provider boundaries have narrow responsibilities:

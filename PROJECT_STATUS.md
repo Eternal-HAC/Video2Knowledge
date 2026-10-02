@@ -978,17 +978,23 @@ Changes:
   `{{ ... }}` remain literal data and cannot trigger a second substitution.
 - Description now uses the same quoted scalar boundary as other Frontmatter
   values. C0/C1 controls, Unicode line and paragraph separators, leading
-  whitespace, non-BMP characters, and lone surrogates have explicit round-trip
-  coverage through the current standard YAML parser used for validation.
+  whitespace, U+FFFE/U+FFFF, non-BMP characters, and lone surrogates have
+  explicit round-trip coverage through the current standard YAML parser used
+  for validation.
+- Existing custom templates using the legacy indented `description` context
+  remain compatible; the packaged template uses `description_yaml`.
+- Lone surrogates in title, summary, bullet, and transcript body fields render
+  as visible `\uXXXX` text so UTF-8 export succeeds. Encoding failures trigger
+  the same partial-output cleanup as other write failures.
 - The partial-write test now fails during `handle.write()` after writing bytes,
   and the Windows filename test supplies forbidden characters through the
   actual title input.
 
 Validation:
 
-- `python -m unittest tests.test_markdown_artifact`: 29 tests, OK.
+- `python -m unittest tests.test_markdown_artifact`: 33 tests, OK.
 - `python -m unittest tests.test_mock_pipeline`: 74 tests, OK.
-- `python -m unittest discover -s tests`: 290 tests, 289 passed, 1 skipped
+- `python -m unittest discover -s tests`: 294 tests, 293 passed, 1 skipped
   (the pre-existing Windows symlink-privilege case).
 - Mock CLI regression, `python -m compileall -q app tests`, and
   `git diff --check` passed.

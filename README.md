@@ -214,7 +214,7 @@ Audio acquisition, media download, and retained audio cache require explicit use
 python -m unittest discover -s tests
 ```
 
-Current test baseline: `290` tests, including the fully mocked
+Current test baseline: `294` tests, including the fully mocked
 `tests/test_local_asr_cli.py` coverage of the `transcribe-local` command and the
 offline model-resolution and tokenizer-guard coverage in
 `tests/test_whisper_backend.py`, plus the Markdown artifact reliability coverage
@@ -269,6 +269,8 @@ characters, Unicode separators, quotes, newlines, and values that merely look
 like booleans, nulls, dates, or numbers remain standard-YAML readable and keep
 their original value and string type. The template is evaluated in one pass,
 so placeholder-like provider data is never reinterpreted as template syntax.
+Markdown body values escape lone surrogates before UTF-8 export, and an
+encoding failure removes the partial file created by that export attempt.
 `raw_metadata` is never rendered into the note.
 
 The default note template is a packaged resource (`app/templates/`) located

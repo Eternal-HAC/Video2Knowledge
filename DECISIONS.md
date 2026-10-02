@@ -1043,14 +1043,17 @@ with stable numeric suffixes.
    duration, language, status, and description) and every tag element
    serialize through one `_format_yaml_scalar` helper. It emits JSON-style
    strings accepted as YAML double-quoted scalars, escapes C0/C1 controls,
-   Unicode line/paragraph separators, and lone surrogates, and leaves ordinary
-   Unicode including non-BMP characters literal for exact parser round trips.
+   Unicode line/paragraph separators, U+FFFE/U+FFFF, and lone surrogates, and
+   leaves ordinary Unicode including non-BMP characters literal for exact
+   parser round trips.
    `None` becomes the plain `null` scalar and an empty tag list becomes `[]`.
    No new dependency is introduced; generation never relies on a YAML library.
 2. The tiny template renderer scans only the original template once. Values
    returned by the placeholder callback are final output and are never scanned
    again as template syntax. Unknown placeholders remain unchanged for custom
-   templates.
+   templates. The legacy indented `description` context remains available for
+   existing block-scalar custom templates, while the packaged template uses
+   the safe `description_yaml` context.
 3. The default template ships as package data under `app/templates/` and is
    read through `importlib.resources`, so rendering no longer depends on the
    current working directory or the repository root, and built distributions
@@ -1066,6 +1069,10 @@ with stable numeric suffixes.
    write failures propagate after best-effort removal of the partial file
    this call exclusively created. Pre-existing files are never opened for
    writing, so there is no check-then-write race window.
+5. Raw Markdown body values escape lone surrogates as visible `\uXXXX` text,
+   ensuring UTF-8 output without altering ordinary Unicode. If encoding still
+   fails, the exporter handles `UnicodeError` like `OSError`, removes only the
+   partial file it exclusively created, and re-raises the original failure.
 
 Rationale:
 
@@ -1107,8 +1114,8 @@ Impact:
 
 `app/markdown_writer.py`, `app/exporter/obsidian.py`, new `app/templates/`
 package resource, `pyproject.toml` package-data only, the repo-root template
-content, and `tests/test_markdown_artifact.py` (29 fully offline tests; full
-suite 290 with one pre-existing skip). `app/pipeline.py`, CLI, providers,
+content, and `tests/test_markdown_artifact.py` (33 fully offline tests; full
+suite 294 with one pre-existing skip). `app/pipeline.py`, CLI, providers,
 ASR, and transcript behavior are unchanged. PyYAML appears in tests only as
 an optional readability oracle when already installed. An offline installed
 package check (`pip install . --no-deps --no-build-isolation --target

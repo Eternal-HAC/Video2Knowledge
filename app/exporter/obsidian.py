@@ -43,14 +43,14 @@ def _write_new_file(path: Path, content: str) -> None:
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
     try:
         handle = os.fdopen(fd, "w", encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeError):
         os.close(fd)
         _remove_partial_output(path)
         raise
     try:
         with handle:
             handle.write(content)
-    except OSError:
+    except (OSError, UnicodeError):
         _remove_partial_output(path)
         raise
 
