@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import datetime, timezone
 from importlib import resources
 from pathlib import Path
@@ -11,6 +13,7 @@ from app.models import Summary, TranscriptSegment, VideoMetadata
 
 DEFAULT_TEMPLATE_PACKAGE = "app.templates"
 DEFAULT_TEMPLATE_NAME = "video_note.md.j2"
+_PLACEHOLDER_PATTERN = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
 
 
 def render_markdown(
@@ -30,10 +33,7 @@ def render_markdown(
 
     template = _read_template(template_path)
     context = _build_context(metadata, summary, transcript)
-    rendered = template
-    for key, value in context.items():
-        rendered = rendered.replace("{{ " + key + " }}", value)
-    return rendered
+    return _render_template_once(template, context)
 
 
 def _build_context(
@@ -55,6 +55,7 @@ def _build_context(
         "language": metadata.language,
         "thumbnail_url": metadata.thumbnail_url,
         "status": metadata.status,
+        "description": metadata.description,
     }
     context = {key: _as_text(value) for key, value in yaml_sources.items()}
     for key, value in yaml_sources.items():
@@ -62,7 +63,6 @@ def _build_context(
     context.update(
         {
             "tags": _format_yaml_list(metadata.tags),
-            "description": _format_yaml_block(metadata.description),
             "one_sentence_summary": summary.one_sentence_summary,
             "core_ideas": _format_bullets(summary.core_ideas),
             "knowledge_points": _format_bullets(summary.knowledge_points),
@@ -103,13 +103,29 @@ def _as_text(value: object) -> str:
     return "" if value is None else str(value)
 
 
-def _format_yaml_scalar(value: object) -> str:
-    """Serialize one value as a YAML 1.1/1.2 compatible scalar.
+def _render_template_once(template: str, context: dict[str, str]) -> str:
+    """Replace placeholders from the original template exactly once.
 
-    Strings are emitted double-quoted with the few escapes YAML defines, so
-    colons, hashes, quotes, newlines, Unicode, and values that merely look
-    like booleans, nulls, dates, or numbers keep their string type. ``None``
-    becomes the plain ``null`` scalar.
+    Values inserted from metadata or generated content are returned directly
+    by the callback and are never scanned again as template syntax.
+    """
+
+    def replace(match: re.Match[str]) -> str:
+        key = match.group(1)
+        return context.get(key, match.group(0))
+
+    return _PLACEHOLDER_PATTERN.sub(replace, template)
+
+
+def _format_yaml_scalar(value: object) -> str:
+    """Serialize one value as a JSON-style string accepted by YAML parsers.
+
+    JSON's quoted-string syntax is compatible with YAML double-quoted scalars.
+    JSON escapes cover quotes, backslashes, and C0 controls; YAML-sensitive C1
+    controls, Unicode line separators, and lone surrogates receive explicit
+    ``\\u`` escapes. Other Unicode, including non-BMP characters, stays literal
+    so YAML parsers do not expose JSON surrogate pairs as two code points.
+    ``None`` is represented by YAML/JSON ``null``.
     """
 
     if value is None:
@@ -118,18 +134,15 @@ def _format_yaml_scalar(value: object) -> str:
         value = str(value)
     escaped: list[str] = []
     for char in value:
-        if char == "\\":
-            escaped.append("\\\\")
-        elif char == '"':
-            escaped.append('\\"')
-        elif char == "\n":
-            escaped.append("\\n")
-        elif char == "\r":
-            escaped.append("\\r")
-        elif char == "\t":
-            escaped.append("\\t")
-        elif ord(char) < 0x20 or ord(char) == 0x7F:
-            escaped.append(f"\\x{ord(char):02X}")
+        codepoint = ord(char)
+        if char in {'"', "\\"} or codepoint < 0x20:
+            escaped.append(json.dumps(char, ensure_ascii=True)[1:-1])
+        elif (
+            0x7F <= codepoint <= 0x9F
+            or codepoint in {0x2028, 0x2029}
+            or 0xD800 <= codepoint <= 0xDFFF
+        ):
+            escaped.append(f"\\u{codepoint:04X}")
         else:
             escaped.append(char)
     return '"' + "".join(escaped) + '"'
@@ -139,20 +152,6 @@ def _format_yaml_list(items: list[str]) -> str:
     """Serialize a list of scalars as a YAML flow sequence, empty as ``[]``."""
 
     return "[" + ", ".join(_format_yaml_scalar(item) for item in items) + "]"
-
-
-def _format_yaml_block(value: str) -> str:
-    """Indent every line of a string for a ``|-`` block scalar.
-
-    The block scalar form keeps multi-line text readable while remaining safe
-    for arbitrary content: every line is indented, so no input line can break
-    out of the frontmatter value.
-    """
-
-    text = _as_text(value)
-    if not text:
-        return "  "
-    return "\n".join(f"  {line}" if line else "  " for line in text.splitlines())
 
 
 def _format_bullets(items: list[str]) -> str:

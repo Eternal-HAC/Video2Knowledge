@@ -1040,13 +1040,18 @@ template located through `importlib.resources`, and exclusive-create export
 with stable numeric suffixes.
 
 1. All Frontmatter scalars (title, platform, URLs, ids, author, dates,
-   duration, language, status) and every tag element serialize through one
-   `_format_yaml_scalar` helper that emits YAML double-quoted style with the
-   escape sequences YAML defines (`\\`, `\"`, `\n`, `\r`, `\t`, `\xXX`).
-   `None` becomes the plain `null` scalar, an empty tag list becomes `[]`, and
-   the description keeps its `|-` block scalar with every line indented. No
-   new dependency is introduced; generation never relies on a YAML library.
-2. The default template ships as package data under `app/templates/` and is
+   duration, language, status, and description) and every tag element
+   serialize through one `_format_yaml_scalar` helper. It emits JSON-style
+   strings accepted as YAML double-quoted scalars, escapes C0/C1 controls,
+   Unicode line/paragraph separators, and lone surrogates, and leaves ordinary
+   Unicode including non-BMP characters literal for exact parser round trips.
+   `None` becomes the plain `null` scalar and an empty tag list becomes `[]`.
+   No new dependency is introduced; generation never relies on a YAML library.
+2. The tiny template renderer scans only the original template once. Values
+   returned by the placeholder callback are final output and are never scanned
+   again as template syntax. Unknown placeholders remain unchanged for custom
+   templates.
+3. The default template ships as package data under `app/templates/` and is
    read through `importlib.resources`, so rendering no longer depends on the
    current working directory or the repository root, and built distributions
    carry the resource. An explicit `template_path` is read verbatim; a missing
@@ -1055,7 +1060,7 @@ with stable numeric suffixes.
    repo-root `templates/video_note.md.j2` remains in place with identical
    content as the development reference, pinned to the packaged copy by a
    sync test.
-3. `export_markdown` creates each candidate file with
+4. `export_markdown` creates each candidate file with
    `os.open(O_WRONLY | O_CREAT | O_EXCL)`. A collision retries with
    `-2`, `-3`, ... suffixes; the function returns the path it actually wrote;
    write failures propagate after best-effort removal of the partial file
@@ -1073,12 +1078,12 @@ overwriting earlier notes. These are artifact-reliability defects in the
 durable output contract, independent of any provider stage, and had to be
 closed before LLM extraction or export expansion builds on top of them.
 
-Double-quoted style was chosen over plain or single-quoted scalars because it
-has the smallest, fully standardized escape set and keeps string type for
-values that resemble booleans, nulls, timestamps, or numbers. The block
-scalar was kept for `description` because it is the readable multi-line form
-and remains safe as long as every content line is indented, which the
-formatter guarantees. Exclusive creation was chosen over
+Double-quoted style was chosen over plain, single-quoted, or block scalars
+because it preserves string type for values that resemble booleans, nulls,
+timestamps, or numbers and can represent controls and leading whitespace
+without YAML indentation inference. One-pass substitution was chosen because
+iterative replacement can reinterpret inserted provider values that resemble
+placeholders. Exclusive creation was chosen over
 check-then-write because only the operating system's create-exclusive
 primitive closes the race window without a lock file; the suffix loop
 terminates because each candidate name is distinct.
@@ -1102,8 +1107,8 @@ Impact:
 
 `app/markdown_writer.py`, `app/exporter/obsidian.py`, new `app/templates/`
 package resource, `pyproject.toml` package-data only, the repo-root template
-content, and `tests/test_markdown_artifact.py` (25 fully offline tests; full
-suite 286 with one pre-existing skip). `app/pipeline.py`, CLI, providers,
+content, and `tests/test_markdown_artifact.py` (29 fully offline tests; full
+suite 290 with one pre-existing skip). `app/pipeline.py`, CLI, providers,
 ASR, and transcript behavior are unchanged. PyYAML appears in tests only as
 an optional readability oracle when already installed. An offline installed
 package check (`pip install . --no-deps --no-build-isolation --target

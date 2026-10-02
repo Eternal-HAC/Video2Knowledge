@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 2026-10-02
+
+- Closed the independent-review gaps in Markdown Frontmatter hardening.
+- Replaced iterative template mutation with one-pass placeholder substitution,
+  so inserted metadata, summaries, and transcript text are never interpreted
+  again as template syntax.
+- Unified descriptions with the JSON-string/YAML-double-quoted scalar path and
+  escaped C0/C1 controls, Unicode line/paragraph separators, and lone
+  surrogates while preserving non-BMP characters as single code points.
+- Added four adversarial regression tests for placeholder-like content,
+  leading whitespace, control/separator characters, non-BMP text, and lone
+  surrogates; corrected write-failure and Windows filename tests.
+- Full offline suite: 290 tests, 289 passed, 1 pre-existing Windows symlink
+  test skipped. Mock CLI, `compileall`, and `git diff --check` passed.
+
 ## 2026-07-05
 
 - Initialized Video2Knowledge project structure.

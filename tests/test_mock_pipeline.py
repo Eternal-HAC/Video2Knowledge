@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import socket
 import subprocess
 import sys
@@ -1186,7 +1187,7 @@ Official subtitle text
         self.assertNotIn("debug_secret", markdown)
         self.assertNotIn("raw metadata should stay out", markdown)
 
-    def test_render_markdown_description_uses_safe_yaml_block(self) -> None:
+    def test_render_markdown_description_uses_safe_quoted_scalar(self) -> None:
         metadata = get_mock_metadata("https://example.com/watch?v=mock")
         metadata = type(metadata)(
             **{
@@ -1208,12 +1209,11 @@ Official subtitle text
 
         markdown = render_markdown(metadata, transcript, summary)
 
-        self.assertIn("description: |-", markdown)
-        self.assertIn("  Line one: has a colon", markdown)
-        self.assertIn('  Line two has "double quotes"', markdown)
-        self.assertIn("  URL: https://example.com/watch?v=mock", markdown)
-        self.assertIn("  # Heading-looking text", markdown)
-        self.assertIn("  - Markdown list item", markdown)
+        description_line = next(
+            line for line in markdown.splitlines() if line.startswith("description: ")
+        )
+        serialized = description_line.removeprefix("description: ")
+        self.assertEqual(json.loads(serialized), metadata.description)
         self.assertNotIn("raw_metadata", markdown)
         self.assertNotIn("debug_secret", markdown)
         self.assertNotIn("raw metadata should stay out", markdown)

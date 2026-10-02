@@ -97,6 +97,8 @@
 - [x] Add YAML Frontmatter hardening.
 - [x] Add template packaging and resource-path hardening.
 - [x] Add exporter collision and overwrite policy.
+- [x] Close Markdown serialization review gaps (one-pass template rendering,
+      quoted description values, and control/Unicode separator round trips).
 - [ ] Add configurable LLM summarizer.
 - [ ] Add Obsidian import workflow.
 

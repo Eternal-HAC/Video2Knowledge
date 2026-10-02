@@ -18,6 +18,7 @@ from unittest import mock
 from app.downloader import get_mock_metadata
 from app.exporter.obsidian import export_markdown
 from app.markdown_writer import render_markdown
+from app.models import Summary, TranscriptSegment
 from app.summarizer import summarize_mock
 from app.transcript import get_mock_transcript
 
@@ -160,16 +161,90 @@ class FrontmatterSerializationTests(unittest.TestCase):
         self.assertNotIn("debug_secret", markdown)
         self.assertNotIn("raw metadata should stay out", markdown)
 
-    def test_description_block_scalar_stays_indented_and_raw_metadata_free(self) -> None:
+    def test_description_round_trips_with_leading_space_and_raw_metadata_stays_out(self) -> None:
+        description = '  Line one: has a colon\nLine two has "double quotes"'
         markdown = _render(
-            description='Line one: has a colon\nLine two has "double quotes"',
+            description=description,
             raw_metadata={"debug_secret": "raw metadata should stay out"},
         )
 
-        self.assertIn("description: |-", markdown)
-        self.assertIn("  Line one: has a colon", markdown)
-        self.assertIn('  Line two has "double quotes"', markdown)
+        parsed = yaml.safe_load(_frontmatter_text(markdown))
+
+        self.assertEqual(parsed["description"], description)
         self.assertNotIn("raw_metadata", markdown)
+
+    @_REQUIRES_YAML
+    def test_placeholder_like_metadata_is_not_reinterpreted(self) -> None:
+        values = {
+            "title": "{{ author_yaml }}",
+            "platform": "{{ source_url_yaml }}",
+            "source_url": "{{ tags }}",
+            "canonical_url": "{{ description_yaml }}",
+            "source_id": "{{ status_yaml }}",
+            "author": "{{ title_yaml }}",
+            "channel_id": "{{ language_yaml }}",
+            "published_at": "{{ duration_yaml }}",
+            "duration": "{{ platform_yaml }}",
+            "language": "{{ thumbnail_url_yaml }}",
+            "thumbnail_url": "{{ source_id_yaml }}",
+            "status": "{{ canonical_url_yaml }}",
+            "description": "{{ one_sentence_summary }}",
+        }
+
+        markdown = _render(**values)
+        parsed = yaml.safe_load(_frontmatter_text(markdown))
+
+        for key, expected in values.items():
+            self.assertEqual(parsed[key], expected)
+        self.assertIn("# {{ author_yaml }}", markdown)
+
+    @_REQUIRES_YAML
+    def test_control_and_separator_characters_round_trip(self) -> None:
+        value = "controls:\x00\x1b\x7f\x80\x81\x85\x9f\u2028\u2029:end"
+        markdown = _render(title=value, description=value, tags=[value])
+
+        parsed = yaml.safe_load(_frontmatter_text(markdown))
+
+        self.assertEqual(parsed["title"], value)
+        self.assertEqual(parsed["description"], value)
+        self.assertEqual(parsed["tags"], [value])
+
+    @_REQUIRES_YAML
+    def test_non_bmp_and_lone_surrogate_round_trip(self) -> None:
+        title = "emoji:\U0001f642"
+        surrogate_value = "surrogate:\ud800"
+        markdown = _render(title=title, description=surrogate_value)
+
+        parsed = yaml.safe_load(_frontmatter_text(markdown))
+
+        self.assertEqual(parsed["title"], title)
+        self.assertEqual(parsed["description"], surrogate_value)
+        markdown.encode("utf-8")
+
+    def test_generated_content_placeholders_are_not_reinterpreted(self) -> None:
+        metadata = _metadata_with()
+        transcript = [
+            TranscriptSegment("00:00:00.000", "00:00:01.000", "{{ title_yaml }}")
+        ]
+        summary = Summary(
+            one_sentence_summary="{{ author_yaml }}",
+            core_ideas=["{{ tags }}"],
+            knowledge_points=["{{ description_yaml }}"],
+            technical_terms=["{{ status_yaml }}"],
+            action_items=["{{ source_url_yaml }}"],
+        )
+
+        markdown = render_markdown(metadata, transcript, summary)
+
+        for placeholder in [
+            "{{ author_yaml }}",
+            "{{ tags }}",
+            "{{ description_yaml }}",
+            "{{ status_yaml }}",
+            "{{ source_url_yaml }}",
+            "{{ title_yaml }}",
+        ]:
+            self.assertIn(placeholder, markdown)
 
 
 class TemplateResolutionTests(unittest.TestCase):
@@ -193,6 +268,7 @@ class TemplateResolutionTests(unittest.TestCase):
         self.assertTrue(resource.is_file())
         content = resource.read_text(encoding="utf-8")
         self.assertIn("{{ title_yaml }}", content)
+        self.assertIn("{{ description_yaml }}", content)
         self.assertIn("{{ title }}", content)
 
     def test_explicit_template_path_is_used_verbatim(self) -> None:
@@ -292,13 +368,29 @@ class ExportCollisionTests(unittest.TestCase):
 
     def test_partial_write_failure_is_cleaned_up_and_raises(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
+            real_fdopen = os.fdopen
 
-            def _failing_write(*args, **kwargs):
-                raise OSError("disk full")
+            class FailingHandle:
+                def __init__(self, fd):
+                    self._handle = real_fdopen(fd, "w", encoding="utf-8")
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc_value, traceback):
+                    self._handle.close()
+
+                def write(self, content):
+                    self._handle.write(content[:3])
+                    self._handle.flush()
+                    raise OSError("disk full")
+
+            def _failing_fdopen(fd, *args, **kwargs):
+                return FailingHandle(fd)
 
             with mock.patch(
                 "app.exporter.obsidian.os.fdopen",
-                side_effect=_failing_write,
+                side_effect=_failing_fdopen,
             ):
                 with self.assertRaises(OSError):
                     export_markdown("payload", "Mock Video", temp_dir)
@@ -347,7 +439,7 @@ class ExportCollisionTests(unittest.TestCase):
 
     def test_windows_forbidden_characters_do_not_break_export(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            path = export_markdown('forbidden <>:/\\|?*" chars', "A Title", temp_dir)
+            path = export_markdown("content", 'forbidden <>:/\\|?*" chars', temp_dir)
 
             self.assertTrue(path.exists())
             self.assertNotIn("<", path.name)

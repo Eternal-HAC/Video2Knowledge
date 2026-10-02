@@ -81,9 +81,11 @@ raw input
 - `audio` provides Mock audio boundaries and a real ffmpeg normalizer for existing local files.
 - `whisper` provides the deterministic Mock local backend and a lazy optional
   `FasterWhisperBackend` boundary for existing normalized audio.
-- The Markdown writer serializes every YAML Frontmatter scalar and tag
-  element through one safe standard-library-only path (YAML double-quoted
-  style with escapes), loads the default note template through
+- The Markdown writer serializes every YAML Frontmatter scalar, description,
+  and tag element through one safe standard-library-only JSON-string/YAML-
+  double-quoted path, and substitutes placeholders from the original template
+  exactly once so inserted provider data cannot become template syntax. It
+  loads the default note template through
   `importlib.resources` from the packaged `app/templates` data so rendering
   is independent of the working directory, and honors explicit custom
   template paths verbatim with stable failure when one is missing. The local

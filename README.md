@@ -214,7 +214,7 @@ Audio acquisition, media download, and retained audio cache require explicit use
 python -m unittest discover -s tests
 ```
 
-Current test baseline: `286` tests, including the fully mocked
+Current test baseline: `290` tests, including the fully mocked
 `tests/test_local_asr_cli.py` coverage of the `transcribe-local` command and the
 offline model-resolution and tokenizer-guard coverage in
 `tests/test_whisper_backend.py`, plus the Markdown artifact reliability coverage
@@ -263,11 +263,12 @@ Generated notes contain YAML Frontmatter and these sections:
 - 可执行事项
 - 原始转录（带时间戳）
 
-Frontmatter scalars and tag elements are serialized through one safe
-standard-library-only path (YAML double-quoted style), so titles, authors,
-URLs, tags, and descriptions containing colons, hashes, quotes, newlines,
-Unicode, or values that merely look like booleans, nulls, dates, or numbers
-remain readable by standard YAML parsers and keep their string type.
+Frontmatter scalars, descriptions, and tag elements are serialized through one
+safe standard-library-only JSON-string/YAML-double-quoted path. Control
+characters, Unicode separators, quotes, newlines, and values that merely look
+like booleans, nulls, dates, or numbers remain standard-YAML readable and keep
+their original value and string type. The template is evaluated in one pass,
+so placeholder-like provider data is never reinterpreted as template syntax.
 `raw_metadata` is never rendered into the note.
 
 The default note template is a packaged resource (`app/templates/`) located

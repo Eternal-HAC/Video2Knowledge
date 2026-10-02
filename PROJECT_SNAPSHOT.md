@@ -2,7 +2,7 @@
 
 ## Snapshot Date
 
-2026-09-26
+2026-10-02
 
 ## Current Version
 
@@ -85,9 +85,10 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
   successful redirect result, or a propagating `KeyboardInterrupt`/`SystemExit`
   (which still propagate, and whose close text still never reaches a public
   error or traceback). Offline evidence only, on the same terms as above.
-- Markdown artifact reliability hardening: every YAML Frontmatter scalar and
-  tag element serializes through one safe standard-library-only path (YAML
-  double-quoted style with escapes), so special characters and
+- Markdown artifact reliability hardening: every YAML Frontmatter scalar,
+  description, and tag element serializes through one safe standard-library-
+  only JSON-string/YAML-double-quoted path, while the original template is
+  scanned exactly once so inserted data cannot become template syntax. Special characters and
   boolean/null/date/number-looking values stay string-typed and standard-YAML
   readable; the default note template is packaged data under `app/templates/`
   located through `importlib.resources`, independent of the working directory
@@ -95,7 +96,7 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
   verbatim and stable `FileNotFoundError` failure; and the local exporter
   creates notes exclusively (`O_CREAT | O_EXCL`) with stable `-2`, `-3`, ...
   suffixes on collision, returning the path actually written and never
-  overwriting existing notes. Proven by 25 fully offline tests plus an
+  overwriting existing notes. Proven by 29 fully offline tests plus an
   offline installed-package render check.
 - Tags:
   - `v0.1.0`: provider boundaries baseline.
@@ -185,8 +186,9 @@ The latest tagged release is `v0.4.0 Official Transcript`. Development is curren
 - Unknown charsets and decode failures map to stable sanitized transcript
   errors; public subtitle fetch errors never retain an underlying exception
   cause; `KeyboardInterrupt` and `SystemExit` propagate unchanged.
-- YAML Frontmatter scalars and tag elements serialize through one safe
-  standard-library-only path (YAML double-quoted style with escapes), so
+- YAML Frontmatter scalars, descriptions, and tag elements serialize through
+  one safe standard-library-only JSON-string/YAML-double-quoted path, and
+  placeholder substitution is one-pass, so
   provider-controlled titles, authors, URLs, and tags cannot break the note
   or change field types; `raw_metadata` never reaches the note.
 - The default note template is packaged data under `app/templates/`, located

@@ -914,7 +914,9 @@ Remaining boundaries:
 
 ## 2026-09-26 Markdown Artifact Reliability Hardening
 
-Status: Markdown artifact reliability hardening implementation complete.
+Status: Initial Markdown artifact reliability implementation committed. A
+later independent review found serialization gaps; the 2026-10-02 closure
+section below records their fix and supersedes the affected claims here.
 
 What changed:
 
@@ -923,9 +925,10 @@ What changed:
   style with escapes), so colons, hashes, quotes, newlines, Unicode, and
   `true`/`null`/date/number-looking strings remain readable by standard YAML
   parsers and keep their string type. Empty strings render as `""`, absent
-  values as `null`, empty tag lists as `[]`, and the description keeps its
-  `|-` block scalar with indented lines. `raw_metadata` still never reaches
-  the note.
+  values as `null`, and empty tag lists as `[]`. The initial description block
+  scalar approach was later replaced by the quoted scalar path after review
+  found an indentation counterexample. `raw_metadata` still never reaches the
+  note.
 - Template packaging: the default note template is now packaged data under
   `app/templates/` and located through `importlib.resources`, independent of
   the working directory and present in built distributions. Custom
@@ -963,6 +966,34 @@ Remaining boundaries:
 - The collision suffix policy is deterministic but not content-aware; two
   different videos with the same normalized title always suffix rather than
   merge or update.
+
+## 2026-10-02 Markdown Serialization Review Closure
+
+Status: Independent-review blockers in the Markdown artifact stage fixed.
+
+Changes:
+
+- Template placeholders are substituted from the original template in one
+  pass. Provider metadata, generated summaries, and transcript text containing
+  `{{ ... }}` remain literal data and cannot trigger a second substitution.
+- Description now uses the same quoted scalar boundary as other Frontmatter
+  values. C0/C1 controls, Unicode line and paragraph separators, leading
+  whitespace, non-BMP characters, and lone surrogates have explicit round-trip
+  coverage through the current standard YAML parser used for validation.
+- The partial-write test now fails during `handle.write()` after writing bytes,
+  and the Windows filename test supplies forbidden characters through the
+  actual title input.
+
+Validation:
+
+- `python -m unittest tests.test_markdown_artifact`: 29 tests, OK.
+- `python -m unittest tests.test_mock_pipeline`: 74 tests, OK.
+- `python -m unittest discover -s tests`: 290 tests, 289 passed, 1 skipped
+  (the pre-existing Windows symlink-privilege case).
+- Mock CLI regression, `python -m compileall -q app tests`, and
+  `git diff --check` passed.
+- No network, provider, ffmpeg, faster-whisper, model, media, dependency, CLI,
+  pipeline, or fallback behavior was added or exercised.
 - PyYAML-based readability assertions run only when PyYAML is already
   installed; without it, the serializer's exact output is still asserted
   directly.
